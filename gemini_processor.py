@@ -9,6 +9,7 @@ from io import BytesIO
 from PIL import Image
 from google import genai
 from google.genai import types
+from config import CURRENCY_SYMBOL
 
 
 # Configure Gemini API
@@ -119,7 +120,7 @@ For every individual receipt found across these images:
 4. Provide a 'box' which is the bounding box surrounding only that specific receipt, in the format [ymin, xmin, ymax, xmax]. Use a scale of 0 to 1000 where [0,0] is top-left and [1000,1000] is bottom-right.
 
 Important:
-- Look for the TOTAL or GRAND TOTAL line on each receipt. Make sure that it's not CHANGE.
+- Look for the TOTAL, GRAND TOTAL, TOTAL DUE, AMOUNT DUE line on each receipt. Make sure that it's not CHANGE.
 - Extract only the final amount to pay
 - Be precise with bounding boxes to capture the entire receipt add some allowance for padding around the receipt if neccessary. It's better to slightly overestimate the bounding box than to cut off parts of the receipt.
 - If a single image contains one receipt, use the format: receipts_0_0 (not just receipts_0)
@@ -156,7 +157,7 @@ If no receipts are found, return an empty array: []"""
         
         # Generate content using the new API
         response = client.models.generate_content(
-            model='gemini-3-flash',
+            model='gemini-3-flash-preview',
             contents=contents
         )
         
@@ -206,10 +207,10 @@ If no receipts are found, return an empty array: []"""
                     'box': box,
                     'image': receipt_image,
                     'source': file_id,
-                    'text': f"Receipt {receipt_id}, Total: ${total:.2f}"
+                    'text': f"Receipt {receipt_id}, Total: {CURRENCY_SYMBOL}{total:.2f}"
                 })
                 
-                print(f"  Processed receipt {receipt_id}: ${total:.2f}")
+                print(f"  Processed receipt {receipt_id}: {CURRENCY_SYMBOL}{total:.2f}")
                 
             except Exception as e:
                 print(f"Error processing receipt data: {e}")

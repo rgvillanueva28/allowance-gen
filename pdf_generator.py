@@ -9,18 +9,20 @@ from reportlab.lib.utils import ImageReader
 from datetime import datetime
 from PIL import Image
 import io
+from config import CURRENCY_SYMBOL
 
 
 def generate_pdf_from_receipts(receipts, output_path, page_size=letter):
     """
     Generate a PDF document containing selected receipts.
+    All pages are portrait orientation. Rotations should be applied to images before calling this function.
     
     Args:
         receipts: List of receipt dictionaries with 'image' and 'amount' keys
         output_path: Path where the PDF should be saved
         page_size: Page size tuple (default: letter)
     """
-    # Create PDF canvas
+    # Create PDF canvas - always use portrait orientation
     c = canvas.Canvas(output_path, pagesize=page_size)
     page_width, page_height = page_size
     
@@ -31,8 +33,16 @@ def generate_pdf_from_receipts(receipts, output_path, page_size=letter):
     
     # Add each receipt on a separate page (no title or summary pages)
     for idx, receipt in enumerate(receipts, 1):
+        # Get the receipt image
+        img = receipt['image'].copy()
+        
+        # Convert to RGB if needed (for JPEG compatibility)
+        if img.mode in ('RGBA', 'LA', 'P'):
+            rgb_img = img.convert('RGB')
+            img = rgb_img
+        
         add_receipt_to_pdf(
-            c, receipt, idx,
+            c, img, idx,
             page_width, page_height,
             margin, usable_width, usable_height
         )
@@ -63,7 +73,7 @@ def add_title_page(c, receipts, page_width, page_height, margin):
     c.setFont("Helvetica", 14)
     info_lines = [
         f"Total Receipts: {len(receipts)}",
-        f"Total Amount: ${total_amount:.2f}",
+        f"Total Amount: {CURRENCY_SYMBOL}{total_amount:.2f}",
     ]
     
     for line in info_lines:
@@ -72,23 +82,10 @@ def add_title_page(c, receipts, page_width, page_height, margin):
         y_pos -= 0.3 * inch
 
 
-def add_receipt_to_pdf(c, receipt, receipt_num, page_width, page_height, margin, usable_width, usable_height):
+def add_receipt_to_pdf(c, img, receipt_num, page_width, page_height, margin, usable_width, usable_height):
     """Add a single receipt to the PDF - image only, no text."""
-    # Get the receipt image
-    img = receipt['image'].copy()
-    
-    # Convert to RGB if needed (for JPEG compatibility)
-    if img.mode in ('RGBA', 'LA', 'P'):
-        rgb_img = img.convert('RGB')
-        img = rgb_img
-    
     # Get image dimensions
     img_width, img_height = img.size
-    
-    # Rotate image to portrait if it's in landscape orientation
-    if img_width > img_height:
-        img = img.transpose(Image.ROTATE_270)  # Rotate clockwise 90 degrees
-        img_width, img_height = img.size
     
     # Optimize image size to reduce PDF file size
     # Target max dimension of 2400px (suitable for 8x10 at 300 DPI)
@@ -128,6 +125,11 @@ def add_receipt_to_pdf(c, receipt, receipt_num, page_width, page_height, margin,
     img_reader = ImageReader(img_buffer)
     
     c.drawImage(img_reader, x_pos, y_pos, display_width, display_height)
+    
+    # Add 1px black border around the image
+    c.setStrokeColorRGB(0, 0, 0)  # Black color
+    c.setLineWidth(1)  # 1px width
+    c.rect(x_pos, y_pos, display_width, display_height, stroke=1, fill=0)
 
 
 def add_summary_page(c, receipts, page_width, page_height, margin):
@@ -168,7 +170,7 @@ def add_summary_page(c, receipts, page_width, page_height, margin):
             source = "..." + source[-42:]
         c.drawString(margin + 0.5*inch, y_pos, source)
         
-        amount_str = f"${receipt['amount']:.2f}"
+        amount_str = f"{CURRENCY_SYMBOL}{receipt['amount']:.2f}"
         c.drawString(margin + 4*inch, y_pos, amount_str)
         
         total += receipt['amount']
@@ -182,4 +184,4 @@ def add_summary_page(c, receipts, page_width, page_height, margin):
     y_pos -= 0.3*inch
     c.setFont("Helvetica-Bold", 12)
     c.drawString(margin + 3.2*inch, y_pos, "Total:")
-    c.drawString(margin + 4*inch, y_pos, f"${total:.2f}")
+    c.drawString(margin + 4*inch, y_pos, f"{CURRENCY_SYMBOL}{total:.2f}")

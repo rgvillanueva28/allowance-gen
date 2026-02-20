@@ -31,7 +31,7 @@
             <div class="result-icon">🎯</div>
             <div class="result-content">
                 <div class="result-label">Target Amount</div>
-                <div class="result-value">${{ "%.2f"|format(target_amount) }}</div>
+                <div class="result-value">₱{{ "%.2f"|format(target_amount) }}</div>
             </div>
         </div>
 
@@ -39,7 +39,7 @@
             <div class="result-icon">💰</div>
             <div class="result-content">
                 <div class="result-label">Selected Total</div>
-                <div class="result-value">${{ "%.2f"|format(selected_total) }}</div>
+                <div class="result-value">₱{{ "%.2f"|format(selected_total) }}</div>
             </div>
         </div>
 
@@ -47,7 +47,7 @@
             <div class="result-icon">📏</div>
             <div class="result-content">
                 <div class="result-label">Difference</div>
-                <div class="result-value">${{ "%.2f"|format(difference) }}</div>
+                <div class="result-value">₱{{ "%.2f"|format(difference) }}</div>
             </div>
         </div>
 
@@ -88,13 +88,16 @@
                 </p>
             {% elif selected_total < target_amount %}
                 <p class="info-message">
-                    <strong>Best Fit Found!</strong> The selected receipts total ${{ "%.2f"|format(selected_total) }}, 
-                    which is ${{ "%.2f"|format(difference) }} below your target of ${{ "%.2f"|format(target_amount) }}.
+                    <strong>Best Fit Found!</strong> The selected receipts total ₱{{ "%.2f"|format(selected_total) }}, 
+                    which is ₱{{ "%.2f"|format(difference) }} below your target of ₱{{ "%.2f"|format(target_amount) }}.
                 </p>
             {% else %}
                 <p class="warning-message">
-                    <strong>Close Match!</strong> The selected receipts total ${{ "%.2f"|format(selected_total) }}, 
-                    which is ${{ "%.2f"|format(difference) }} above your target of ${{ "%.2f"|format(target_amount) }}.
+                    <strong>Close Match!</strong> The selected receipts total ₱{{ "%.2f"|format(selected_total) }}, 
+                    which is ₱{{ "%.2f"|format(difference) }} above your target of ₱{{ "%.2f"|format(target_amount) }}.
+                    {% if difference <= 100 %}
+                    This is within the allowed overage limit of ₱100.
+                    {% endif %}
                 </p>
             {% endif %}
         </div>

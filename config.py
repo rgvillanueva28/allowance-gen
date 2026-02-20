@@ -3,6 +3,15 @@ Configuration settings for the receipt processing application.
 Modify these settings to customize the application behavior.
 """
 
+# Currency Configuration
+CURRENCY_SYMBOL = '₱'  # Philippine Peso
+CURRENCY_CODE = 'PHP'
+CURRENCY_NAME = 'Philippine Peso'
+
+# Receipt Selection Configuration
+MAX_OVERAGE_ALLOWED = 100  # Maximum amount allowed to exceed target
+EXACT_MATCH_TOLERANCE = 0.01  # Tolerance for "exact" match
+
 # Google Gemini API Configuration
 # Set your API key as an environment variable: GEMINI_API_KEY
 # Get your API key from: https://aistudio.google.com/app/apikey

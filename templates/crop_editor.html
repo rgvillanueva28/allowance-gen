@@ -1,0 +1,616 @@
+{% extends "base.html" %}
+
+{% block title %}Crop Receipts - Receipt Processing{% endblock %}
+
+{% block content %}
+<div class="crop-editor-section">
+    <div class="header-section">
+        <h2>Adjust Receipt Crops</h2>
+        <p class="subtitle">Drag the crop box to adjust boundaries. Use corner handles to resize.</p>
+        <div class="info-banner">
+            <strong>ℹ️ Working with Original Images</strong>
+            <p>You're editing the full original images - adjust the green crop box to select the exact receipt area you want.</p>
+        </div>
+    </div>
+
+    <div class="editor-container">
+        <div class="receipts-list">
+            {% for receipt in receipts %}
+            <div class="receipt-item" data-index="{{ loop.index0 }}">
+                <div class="receipt-preview">
+                    <img src="{{ url_for('get_original_image', job_id=job_id, filename=receipt.filename) }}" 
+                         alt="{{ receipt.id }}">
+                </div>
+                <div class="receipt-info">
+                    <strong>${{ "%.2f"|format(receipt.amount) }}</strong>
+                    <small>{{ receipt.id }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="editor-canvas-container">
+            <div class="editor-toolbar">
+                <button id="reset-crop" class="btn btn-secondary">Reset Crop</button>
+                <button id="rotate-left" class="btn btn-secondary">↺ Rotate Left</button>
+                <button id="rotate-right" class="btn btn-secondary">↻ Rotate Right</button>
+                <span class="current-receipt-info">
+                    Receipt <span id="current-index">1</span> of {{ receipts|length }}
+                </span>
+            </div>
+            
+            <div class="canvas-wrapper">
+                <canvas id="crop-canvas"></canvas>
+                <div id="crop-box" class="crop-box">
+                    <div class="crop-handle nw"></div>
+                    <div class="crop-handle ne"></div>
+                    <div class="crop-handle sw"></div>
+                    <div class="crop-handle se"></div>
+                </div>
+            </div>
+
+            <div class="editor-actions">
+                <button id="prev-receipt" class="btn btn-secondary">← Previous</button>
+                <button id="next-receipt" class="btn btn-primary">Next →</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <a href="{{ url_for('view_images') }}" class="btn btn-secondary">Cancel</a>
+        <button id="save-crops" class="btn btn-primary">
+            <span class="btn-icon">💾</span>
+            Save & Generate PDF
+        </button>
+    </div>
+</div>
+
+<style>
+    .crop-editor-section {
+        padding: 2rem 0;
+    }
+    
+    .info-banner {
+        background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+        border-left: 4px solid #2196F3;
+        border-radius: 8px;
+        padding: 1rem 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .info-banner strong {
+        color: #1976D2;
+        display: block;
+        margin-bottom: 0.5rem;
+        font-size: 1rem;
+    }
+    
+    .info-banner p {
+        color: #424242;
+        margin: 0;
+        font-size: 0.9rem;
+    }
+
+    .editor-container {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        gap: 2rem;
+        margin: 2rem 0;
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .receipts-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        max-height: 600px;
+        overflow-y: auto;
+        padding-right: 0.5rem;
+    }
+
+    .receipt-item {
+        background: #f5f5f5;
+        border-radius: 8px;
+        padding: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .receipt-item:hover {
+        background: #e8f5e9;
+    }
+
+    .receipt-item.active {
+        background: #c8e6c9;
+        border-color: #4CAF50;
+    }
+
+    .receipt-preview {
+        width: 100%;
+        height: 120px;
+        overflow: hidden;
+        border-radius: 5px;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .receipt-preview img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .receipt-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        text-align: center;
+    }
+
+    .receipt-info strong {
+        color: #4CAF50;
+        font-size: 1.1rem;
+    }
+
+    .receipt-info small {
+        color: #666;
+        font-size: 0.85rem;
+    }
+
+    .editor-canvas-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .editor-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f5f5f5;
+        border-radius: 8px;
+    }
+
+    .current-receipt-info {
+        margin-left: auto;
+        font-weight: 600;
+        color: #666;
+    }
+
+    .canvas-wrapper {
+        position: relative;
+        width: 100%;
+        min-height: 400px;
+        max-height: 70vh;
+        background: #f0f0f0;
+        border-radius: 8px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    #crop-canvas {
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+        position: relative;
+        z-index: 1;
+    }
+
+    .crop-box {
+        position: absolute;
+        border: 3px dashed #4CAF50;
+        background: rgba(76, 175, 80, 0.1);
+        cursor: move;
+        display: none;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+        z-index: 2;
+        touch-action: none;
+    }
+
+    .crop-box.active {
+        display: block;
+    }
+
+    .crop-handle {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        background: #4CAF50;
+        border: 3px solid white;
+        border-radius: 50%;
+        cursor: pointer;
+        z-index: 3;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .crop-handle.nw { top: -10px; left: -10px; cursor: nw-resize; }
+    .crop-handle.ne { top: -10px; right: -10px; cursor: ne-resize; }
+    .crop-handle.sw { bottom: -10px; left: -10px; cursor: sw-resize; }
+    .crop-handle.se { bottom: -10px; right: -10px; cursor: se-resize; }
+    
+    /* Mobile optimizations */
+    @media (max-width: 768px) {
+        .editor-container {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+        
+        .receipts-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            max-height: none;
+            gap: 0.5rem;
+        }
+        
+        .receipt-preview {
+            height: 80px;
+        }
+        
+        .crop-handle {
+            width: 44px;
+            height: 44px;
+            border-width: 4px;
+        }
+        
+        .crop-handle.nw { top: -22px; left: -22px; }
+        .crop-handle.ne { top: -22px; right: -22px; }
+        .crop-handle.sw { bottom: -22px; left: -22px; }
+        .crop-handle.se { bottom: -22px; right: -22px; }
+        
+        .editor-toolbar {
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .current-receipt-info {
+            width: 100%;
+            text-align: center;
+            margin: 0;
+        }
+        
+        .canvas-wrapper {
+            min-height: 300px;
+            max-height: 50vh;
+        }
+    }
+
+    .editor-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+
+    .action-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        margin-top: 2rem;
+    }
+</style>
+
+<script>
+    const receipts = {{ receipts|tojson }};
+    const jobId = "{{ job_id }}";
+    let currentIndex = 0;
+    let cropData = {};
+    let currentImage = null;
+    let rotation = {};
+    
+    const canvas = document.getElementById('crop-canvas');
+    const ctx = canvas.getContext('2d');
+    const cropBox = document.getElementById('crop-box');
+    
+    // Initialize crop data from Gemini AI bounding boxes
+    receipts.forEach((receipt, idx) => {
+        // If receipt has a bounding box from AI, use it as initial crop
+        if (receipt.box && Array.isArray(receipt.box) && receipt.box.length === 4) {
+            // Box format: [ymin, xmin, ymax, xmax] with 0-1000 scale
+            const [ymin, xmin, ymax, xmax] = receipt.box;
+            cropData[idx] = {
+                x: xmin / 1000,
+                y: ymin / 1000,
+                width: (xmax - xmin) / 1000,
+                height: (ymax - ymin) / 1000
+            };
+        } else {
+            // Default to full image
+            cropData[idx] = { x: 0, y: 0, width: 1, height: 1 };
+        }
+        rotation[idx] = 0;
+    });
+    
+    function loadReceipt(index) {
+        currentIndex = index;
+        const receipt = receipts[index];
+        
+        // Update UI
+        document.querySelectorAll('.receipt-item').forEach((item, idx) => {
+            item.classList.toggle('active', idx === index);
+        });
+        document.getElementById('current-index').textContent = index + 1;
+        
+        // Load original image (pristine, uncropped version)
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+            currentImage = img;
+            drawImage();
+        };
+        img.src = `/original-image/${jobId}/${receipt.filename}`;
+    }
+    
+    function drawImage() {
+        if (!currentImage) return;
+        
+        const rot = rotation[currentIndex] || 0;
+        
+        // Calculate dimensions
+        let imgWidth = currentImage.width;
+        let imgHeight = currentImage.height;
+        
+        if (rot === 90 || rot === 270) {
+            [imgWidth, imgHeight] = [imgHeight, imgWidth];
+        }
+        
+        // Fit to canvas
+        const maxWidth = 800;
+        const maxHeight = 500;
+        let scale = Math.min(maxWidth / imgWidth, maxHeight / imgHeight, 1);
+        
+        canvas.width = imgWidth * scale;
+        canvas.height = imgHeight * scale;
+        
+        // Draw rotated image
+        ctx.save();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        ctx.rotate(rot * Math.PI / 180);
+        ctx.drawImage(currentImage, -currentImage.width * scale / 2, -currentImage.height * scale / 2, 
+                     currentImage.width * scale, currentImage.height * scale);
+        ctx.restore();
+        
+        updateCropBox();
+    }
+    
+    function updateCropBox() {
+        const crop = cropData[currentIndex];
+        const canvasRect = canvas.getBoundingClientRect();
+        const wrapperRect = canvas.parentElement.getBoundingClientRect();
+        
+        // Calculate canvas offset within wrapper
+        const offsetLeft = canvasRect.left - wrapperRect.left;
+        const offsetTop = canvasRect.top - wrapperRect.top;
+        
+        // Position crop box relative to canvas position
+        cropBox.style.left = (offsetLeft + crop.x * canvas.width) + 'px';
+        cropBox.style.top = (offsetTop + crop.y * canvas.height) + 'px';
+        cropBox.style.width = (crop.width * canvas.width) + 'px';
+        cropBox.style.height = (crop.height * canvas.height) + 'px';
+        cropBox.classList.add('active');
+    }
+    
+    // Navigation
+    document.getElementById('prev-receipt').addEventListener('click', () => {
+        if (currentIndex > 0) loadReceipt(currentIndex - 1);
+    });
+    
+    document.getElementById('next-receipt').addEventListener('click', () => {
+        if (currentIndex < receipts.length - 1) loadReceipt(currentIndex + 1);
+    });
+    
+    document.querySelectorAll('.receipt-item').forEach((item, idx) => {
+        item.addEventListener('click', () => loadReceipt(idx));
+    });
+    
+    // Reset crop
+    document.getElementById('reset-crop').addEventListener('click', () => {
+        cropData[currentIndex] = { x: 0, y: 0, width: 1, height: 1 };
+        updateCropBox();
+    });
+    
+    // Rotation
+    document.getElementById('rotate-left').addEventListener('click', () => {
+        rotation[currentIndex] = ((rotation[currentIndex] || 0) - 90 + 360) % 360;
+        drawImage();
+    });
+    
+    document.getElementById('rotate-right').addEventListener('click', () => {
+        rotation[currentIndex] = ((rotation[currentIndex] || 0) + 90) % 360;
+        drawImage();
+    });
+    
+    // Crop box dragging
+    let isDragging = false;
+    let dragHandle = null;
+    let startX, startY;
+    
+    cropBox.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('crop-handle')) {
+            dragHandle = e.target.classList[1];
+        } else {
+            dragHandle = 'move';
+        }
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        e.preventDefault();
+        e.stopPropagation();
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        
+        // Calculate movement in normalized coordinates (0-1)
+        const dx = (e.clientX - startX) / canvas.width;
+        const dy = (e.clientY - startY) / canvas.height;
+        const crop = cropData[currentIndex];
+        
+        if (dragHandle === 'move') {
+            crop.x = Math.max(0, Math.min(1 - crop.width, crop.x + dx));
+            crop.y = Math.max(0, Math.min(1 - crop.height, crop.y + dy));
+        } else {
+            // Handle corner resizing
+            const newCrop = { ...crop };
+            if (dragHandle.includes('n')) {
+                const change = Math.min(dy, crop.height - 0.1);
+                newCrop.y += change;
+                newCrop.height -= change;
+            }
+            if (dragHandle.includes('s')) {
+                newCrop.height = Math.max(0.1, Math.min(1 - crop.y, crop.height + dy));
+            }
+            if (dragHandle.includes('w')) {
+                const change = Math.min(dx, crop.width - 0.1);
+                newCrop.x += change;
+                newCrop.width -= change;
+            }
+            if (dragHandle.includes('e')) {
+                newCrop.width = Math.max(0.1, Math.min(1 - crop.x, crop.width + dx));
+            }
+            
+            // Validate bounds
+            if (newCrop.width >= 0.1 && newCrop.height >= 0.1 &&
+                newCrop.x >= 0 && newCrop.y >= 0 &&
+                newCrop.x + newCrop.width <= 1 && newCrop.y + newCrop.height <= 1) {
+                Object.assign(crop, newCrop);
+            }
+        }
+        
+        startX = e.clientX;
+        startY = e.clientY;
+        updateCropBox();
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        dragHandle = null;
+    });
+    
+    // Touch support for mobile devices
+    let touchStartX, touchStartY;
+    
+    cropBox.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        if (target && target.classList.contains('crop-handle')) {
+            dragHandle = target.classList[1];
+        } else {
+            dragHandle = 'move';
+        }
+        isDragging = true;
+        touchStartX = startX = touch.clientX;
+        touchStartY = startY = touch.clientY;
+    });
+    
+    document.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        
+        const touch = e.touches[0];
+        // Calculate movement in normalized coordinates (0-1)
+        const dx = (touch.clientX - startX) / canvas.width;
+        const dy = (touch.clientY - startY) / canvas.height;
+        const crop = cropData[currentIndex];
+        
+        if (dragHandle === 'move') {
+            crop.x = Math.max(0, Math.min(1 - crop.width, crop.x + dx));
+            crop.y = Math.max(0, Math.min(1 - crop.height, crop.y + dy));
+        } else {
+            // Handle corner resizing
+            const newCrop = { ...crop };
+            if (dragHandle.includes('n')) {
+                const change = Math.min(dy, crop.height - 0.1);
+                newCrop.y += change;
+                newCrop.height -= change;
+            }
+            if (dragHandle.includes('s')) {
+                newCrop.height = Math.max(0.1, Math.min(1 - crop.y, crop.height + dy));
+            }
+            if (dragHandle.includes('w')) {
+                const change = Math.min(dx, crop.width - 0.1);
+                newCrop.x += change;
+                newCrop.width -= change;
+            }
+            if (dragHandle.includes('e')) {
+                newCrop.width = Math.max(0.1, Math.min(1 - crop.x, crop.width + dx));
+            }
+            
+            // Validate bounds
+            if (newCrop.width >= 0.1 && newCrop.height >= 0.1 &&
+                newCrop.x >= 0 && newCrop.y >= 0 &&
+                newCrop.x + newCrop.width <= 1 && newCrop.y + newCrop.height <= 1) {
+                Object.assign(crop, newCrop);
+            }
+        }
+        
+        startX = touch.clientX;
+        startY = touch.clientY;
+        updateCropBox();
+    }, { passive: false });
+    
+    document.addEventListener('touchend', () => {
+        isDragging = false;
+        dragHandle = null;
+    });
+    
+    // Save crops
+    document.getElementById('save-crops').addEventListener('click', async () => {
+        const btn = document.getElementById('save-crops');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-icon">⏳</span> Processing...';
+        
+        try {
+            const response = await fetch('/save-crops', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    job_id: jobId,
+                    crops: cropData,
+                    rotations: rotation
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                window.location.href = '/results';
+            } else {
+                alert('Error: ' + result.error);
+            }
+        } catch (error) {
+            alert('Error saving crops: ' + error);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="btn-icon">💾</span> Save & Generate PDF';
+        }
+    });
+    
+    // Update crop box position on window resize
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            if (currentImage) {
+                drawImage();
+            }
+        }, 250);
+    });
+    
+    // Initialize
+    loadReceipt(0);
+</script>
+{% endblock %}

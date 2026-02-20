@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}About - Receipt Processing{% endblock %}
+
+{% block content %}
+<div class="about-section">
+    <div class="header-section">
+        <h2>About Receipt Processor</h2>
+        <p class="subtitle">Intelligent receipt processing powered by OCR and computer vision</p>
+    </div>
+
+    <div class="content-card">
+        <h3>🎯 What It Does</h3>
+        <p>
+            This application automatically processes receipt images to help you select and compile 
+            receipts that match a target amount. Perfect for expense reports, reimbursements, 
+            or any situation where you need to reach a specific total.
+        </p>
+    </div>
+
+    <div class="content-card">
+        <h3>✨ Key Features</h3>
+        <ul class="feature-list">
+            <li><strong>AI-Powered Detection:</strong> Uses Google Gemini AI for accurate receipt analysis</li>
+            <li><strong>Multi-Receipt Detection:</strong> Automatically detects multiple receipts in a single image</li>
+            <li><strong>Intelligent Extraction:</strong> AI understands receipt structure and extracts totals accurately</li>
+            <li><strong>Smart Selection:</strong> Intelligent algorithms find the best receipt combination</li>
+            <li><strong>Image Extraction:</strong> Saves each selected receipt as a separate image</li>
+            <li><strong>PDF Generation:</strong> Creates professional PDF with all selected receipts</li>
+            <li><strong>Web Interface:</strong> Easy-to-use browser-based interface</li>
+        </ul>
+    </div>
+
+    <div class="content-card">
+        <h3>🔧 How It Works</h3>
+        <div class="process-steps">
+            <div class="process-step">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h4>Upload Images</h4>
+                    <p>Upload one or more images containing receipts</p>
+                </div>
+            </div>
+            <div class="process-step">
+                <div class="step-number">2</div>
+                <div claAI Analysis</h4>
+                    <p>Google Gemini AI detects and analyzes all receipts</p>
+                </div>
+            </div>
+            <div class="process-step">
+                <div class="step-number">3</div>
+                <div class="step-content">
+                    <h4>Amount Extraction</h4>
+                    <p>AI intelligently extracts total amounts from receip
+                    <p>Tesseract OCR extracts text and identifies total amounts</p>
+                </div>
+            </div>
+            <div class="process-step">
+                <div class="step-number">4</div>
+                <div class="step-content">
+                    <h4>Smart Selection</h4>
+                    <p>Algorithms select receipts matching your target amount</p>
+                </div>
+            </div>
+            <div class="process-step">
+                <div class="step-number">5</div>
+                <div class="step-content">
+                    <h4>PDF Generation</h4>
+                    <p>Creates a professional PDF with title page and summary</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-card">
+        <h3>💡 Tips for Best Results</h3>
+        <ul class="tips-list">
+            <li>Use clear, well-lit images for best AI recognition</li>
+            <li>Ensure receipt text is legible and not blurry</li>
+            <li>Keep receipts flat when photographing</li>
+            <li>Avoid heavy shadows or glare on receipts</li>
+            <li>Supported formats: PNG, JPG, JPEG, GIF, BMP, TIFF</li>
+            <li>Maximum file size: 16MB per image</li>
+        </ul>
+    </div>
+
+    <div class="content-card">
+        <h3>🛠️ Technology Stack</h3>
+        <div class="tech-grid">
+            <div class="tech-item">
+                <strong>Flask</strong>
+                <span>Web Framework</span>
+            </div>
+            <div class="tech-item">
+                <strong>Google Gemini</strong>
+                <span>AI Vision</span>
+            </div>
+            <div class="tech-item">
+                <strong>ReportLab</strong>
+                <span>PDF Generation</span>
+            </div>
+            <div class="tech-item">
+                <strong>Pillow</strong>
+                <span>Image Processing</span>
+            </div>
+            <div class="tech-item">
+                <strong>Python</strong>
+                <span>Backend Logic</span>
+            </div>
+            <div class="tech-item">
+                <strong>HTML/CSS</strong>
+                <span>Frontend UI</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-buttons">
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-large">
+            <span class="btn-icon">🚀</span>
+            Get Started
+        </a>
+    </div>
+</div>
+
+<style>
+    .about-section {
+        max-width: 800px;
+        margin: 0 auto;
+    }
+
+    .content-card {
+        background: white;
+        padding: 2rem;
+        margin: 2rem 0;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .content-card h3 {
+        margin-top: 0;
+        color: #2196F3;
+        font-size: 1.5rem;
+    }
+
+    .feature-list, .tips-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .feature-list li, .tips-list li {
+        padding: 0.5rem 0 0.5rem 2rem;
+        position: relative;
+    }
+
+    .feature-list li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        color: #4CAF50;
+        font-weight: bold;
+        font-size: 1.2rem;
+    }
+
+    .tips-list li::before {
+        content: "💡";
+        position: absolute;
+        left: 0;
+    }
+
+    .process-steps {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .process-step {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-start;
+    }
+
+    .step-number {
+        background: #2196F3;
+        color: white;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        flex-shrink: 0;
+    }
+
+    .step-content h4 {
+        margin: 0 0 0.5rem 0;
+        color: #333;
+    }
+
+    .step-content p {
+        margin: 0;
+        color: #666;
+    }
+
+    .tech-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .tech-item {
+        display: flex;
+        flex-direction: column;
+        padding: 1rem;
+        background: #f5f5f5;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .tech-item strong {
+        color: #2196F3;
+        font-size: 1.1rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .tech-item span {
+        color: #666;
+        font-size: 0.9rem;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Receipts - Receipt Processing{% endblock %}
+
+{% block content %}
+<div class="upload-section">
+    <div class="header-section">
+        <h2>Upload Receipt Images</h2>
+        <p class="subtitle">Upload images containing receipts and specify your target amount</p>
+    </div>
+
+    <form action="{{ url_for('upload_files') }}" method="post" enctype="multipart/form-data" id="uploadForm">
+        <div class="form-group">
+            <label for="files">Select Receipt Images</label>
+            <div class="file-upload-wrapper">
+                <input type="file" id="files" name="files[]" multiple accept="image/*" required>
+                <div class="file-upload-display">
+                    <span class="upload-icon">📁</span>
+                    <span class="upload-text">Click to select images or drag and drop</span>
+                    <span class="file-count" id="fileCount"></span>
+                </div>
+            </div>
+            <p class="help-text">Supported formats: PNG, JPG, JPEG, GIF, BMP, TIFF (Max 100MB total)</p>
+        </div>
+
+        <div class="form-group">
+            <label for="target_amount">Target Amount ($)</label>
+            <div class="input-wrapper">
+                <span class="currency-symbol">$</span>
+                <input 
+                    type="number" 
+                    id="target_amount" 
+                    name="target_amount" 
+                    step="0.01" 
+                    min="0.01" 
+                    placeholder="100.00"
+                    required
+                >
+            </div>
+            <p class="help-text">Enter the total amount you want to reach</p>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            <span class="btn-icon">🚀</span>
+            Process Receipts
+        </button>
+    </form>
+
+    <div class="features">
+        <h3>How It Works</h3>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📸</div>
+                <h4>1. Upload Images</h4>
+                <p>Upload one or more images containing receipts</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔍</div>
+                <h4>2. AI Detection</h4>
+                <p>Google Gemini AI detects and analyzes receipts</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">💰</div>
+                <h4>3. Amount Extraction</h4>
+                <p>AI intelligently extracts amounts from receipts</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">✅</div>
+                <h4>4. Smart Selection</h4>
+                <p>Selects receipts matching your target amount</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📄</div>
+                <h4>5. Generate PDF</h4>
+                <p>Creates a professional PDF compilation</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⬇️</div>
+                <h4>6. Download</h4>
+                <p>Download your PDF and receipt images</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="quick-actions" style="text-align: center; margin-top: 3rem; padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+        <h3 style="margin-bottom: 1rem;">📂 View Previous Jobs</h3>
+        <p style="color: #666; margin-bottom: 1rem;">Access your saved processing jobs to re-crop, download, or review results</p>
+        <a href="{{ url_for('history') }}" class="btn btn-secondary">
+            <span class="btn-icon">📋</span>
+            View History
+        </a>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('files');
+    const fileCount = document.getElementById('fileCount');
+    const uploadText = document.querySelector('.upload-text');
+
+    fileInput.addEventListener('change', function() {
+        const count = this.files.length;
+        if (count > 0) {
+            fileCount.textContent = `${count} file${count > 1 ? 's' : ''} selected`;
+            uploadText.textContent = 'Files selected:';
+        } else {
+            fileCount.textContent = '';
+            uploadText.textContent = 'Click to select images or drag and drop';
+        }
+    });
+
+    // Drag and drop
+    const wrapper = document.querySelector('.file-upload-wrapper');
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        wrapper.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        wrapper.addEventListener(eventName, () => {
+            wrapper.classList.add('drag-over');
+        });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        wrapper.addEventListener(eventName, () => {
+            wrapper.classList.remove('drag-over');
+        });
+    });
+
+    wrapper.addEventListener('drop', function(e) {
+        const dt = e.dataTransfer;
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event('change'));
+    });
+
+    // Form validation
+    document.getElementById('uploadForm').addEventListener('submit', function(e) {
+        const target = document.getElementById('target_amount').value;
+        if (parseFloat(target) <= 0) {
+            e.preventDefault();
+            alert('Please enter a positive target amount.');
+            return false;
+        }
+        
+        // Show loading state
+        const btn = this.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Processing...';
+    });
+</script>
+{% endblock %}

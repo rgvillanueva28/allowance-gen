@@ -615,16 +615,31 @@
         btn.disabled = true;
         btn.innerHTML = '<span class=\"btn-icon\">⏳</span> Generating...';
         
+        // Collect currently selected receipt indices
+        const selectedIndices = [];
+        document.querySelectorAll('.receipt-checkbox:checked').forEach(checkbox => {
+            const index = parseInt(checkbox.id.replace('checkbox-', ''));
+            selectedIndices.push(index);
+        });
+        
+        if (selectedIndices.length === 0) {
+            alert('Please select at least one receipt to include in the PDF');
+            btn.disabled = false;
+            btn.innerHTML = '<span class=\"btn-icon\">🔄</span> Regenerate PDF';
+            return;
+        }
+        
         try {
             const response = await fetch('/regenerate-pdf', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ selected_indices: selectedIndices })
             });
             
             const result = await response.json();
             
             if (result.success) {
-                alert('PDF regenerated successfully with updated amounts!');
+                alert(`PDF regenerated successfully! Included ${result.selected_count} receipt(s) totaling ₱${result.selected_total.toFixed(2)}`);
             } else {
                 alert('Error: ' + result.error);
             }
@@ -693,48 +708,66 @@
         btn.disabled = true;
         btn.innerHTML = '<span class=\"btn-icon\">⏳</span> Computing...';
         
-        // Get indices of currently selected receipts
-        const selectedIndices = [];
-        document.querySelectorAll('.receipt-checkbox:checked').forEach(checkbox => {
-            const index = parseInt(checkbox.id.replace('checkbox-', ''));
-            selectedIndices.push(index);
-        });
-        
-        if (selectedIndices.length === 0) {
-            alert('Please select at least one receipt to recompute');
-            btn.disabled = false;
-            btn.innerHTML = '<span class=\"btn-icon\">🔄</span> Recompute Best Selection';
-            return;
-        }
+        // Send ALL receipt indices to backend - let the algorithm decide which to select
+        // This allows recomputing optimal selection from all available receipts
+        const allIndices = receipts.map((_, index) => index);
         
         try {
+            console.log('Recompute: Analyzing all receipts:', allIndices);
+            
             const response = await fetch('/recompute-selection', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ selected_indices: selectedIndices })
+                body: JSON.stringify({ selected_indices: allIndices })
             });
             
             const result = await response.json();
+            console.log('Recompute: Received result:', result);
             
             if (result.success) {
-                // Update all checkboxes based on new selection
+                // Track current selection before updating
+                const beforeSelection = Array.from(document.querySelectorAll('.receipt-checkbox:checked')).map(cb => 
+                    parseInt(cb.id.replace('checkbox-', ''))
+                );
+                
+                console.log('Recompute: Before:', beforeSelection, 'After:', result.selected_indices);
+                
+                // Update all checkboxes based on new optimal selection
                 document.querySelectorAll('.receipt-checkbox').forEach(checkbox => {
                     const index = parseInt(checkbox.id.replace('checkbox-', ''));
                     const shouldBeChecked = result.selected_indices.includes(index);
                     checkbox.checked = shouldBeChecked;
                     
                     const card = document.querySelector(`.image-card[data-index="${index}"]`);
-                    card.setAttribute('data-selected', shouldBeChecked);
+                    card.setAttribute('data-selected', shouldBeChecked ? 'true' : 'false');
                 });
                 
                 // Update totals
                 updateSelectedTotals();
                 
-                alert(`Optimal selection found! Selected ${result.selected_count} receipts totaling ₱${result.selected_total.toFixed(2)}`);
+                // Calculate changes
+                const addedCount = result.selected_indices.filter(i => !beforeSelection.includes(i)).length;
+                const removedCount = beforeSelection.filter(i => !result.selected_indices.includes(i)).length;
+                const unchanged = result.selected_indices.filter(i => beforeSelection.includes(i)).length;
+                
+                let message = `Optimal selection found!\n\n`;
+                message += `Selected: ${result.selected_count} receipts\n`;
+                message += `Total: ₱${result.selected_total.toFixed(2)} (Target: ₱${result.target_amount.toFixed(2)})\n\n`;
+                
+                if (addedCount === 0 && removedCount === 0) {
+                    message += `No changes made - current selection is already optimal!`;
+                } else {
+                    if (addedCount > 0) message += `✓ Added: ${addedCount} receipt(s)\n`;
+                    if (removedCount > 0) message += `✗ Removed: ${removedCount} receipt(s)\n`;
+                    if (unchanged > 0) message += `→ Kept: ${unchanged} receipt(s)`;
+                }
+                
+                alert(message);
             } else {
                 alert('Error: ' + result.error);
             }
         } catch (error) {
+            console.error('Recompute error:', error);
             alert('Error recomputing selection: ' + error);
         } finally {
             btn.disabled = false;

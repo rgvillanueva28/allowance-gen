@@ -501,12 +501,22 @@ def regenerate_pdf():
         if not job_id:
             return jsonify({'success': False, 'error': 'Session expired'})
         
-        # Get current receipt data and selection from session
+        # Get selected indices from request (if provided), otherwise use session
+        data = request.get_json() or {}
+        selected_indices = data.get('selected_indices')
+        
+        # Get current receipt data from session
         receipt_data = session.get('receipt_data', [])
-        selected_indices = session.get('selected_indices', list(range(len(receipt_data))))
         
         if not receipt_data:
             return jsonify({'success': False, 'error': 'No receipts found'})
+        
+        # If selected_indices not provided in request, use session default
+        if selected_indices is None:
+            selected_indices = session.get('selected_indices', list(range(len(receipt_data))))
+        
+        if not selected_indices or len(selected_indices) == 0:
+            return jsonify({'success': False, 'error': 'No receipts selected'})
         
         # Load images for SELECTED receipts only
         receipts_dir = OUTPUT_FOLDER / job_id / 'receipts'
@@ -528,27 +538,39 @@ def regenerate_pdf():
                     'source': receipt_info.get('id', receipt_info['filename'])
                 })
         
+        if not processed_receipts:
+            return jsonify({'success': False, 'error': 'No valid receipt images found'})
+        
+        # Calculate selected total
+        selected_total = sum(r['amount'] for r in processed_receipts)
+        
         # Generate PDF with selected receipts
         pdf_path = OUTPUT_FOLDER / job_id / 'selected_receipts.pdf'
         generate_pdf_from_receipts(processed_receipts, str(pdf_path))
         
-        # Update session
+        # Update session with new selection
         session['pdf_path'] = str(pdf_path)
+        session['selected_indices'] = selected_indices
         session['selected_count'] = len(processed_receipts)
-        session['selected_total'] = sum(r['amount'] for r in processed_receipts)
+        session['selected_total'] = selected_total
         
-        # Update metadata
+        # Update metadata with new selection
         metadata = load_job_metadata(job_id)
         if metadata:
             metadata['last_modified'] = datetime.now().isoformat()
             metadata['pdf_regenerated'] = True
+            metadata['selected_indices'] = selected_indices
             metadata['selected_count'] = len(processed_receipts)
-            metadata['selected_total'] = sum(r['amount'] for r in processed_receipts)
+            metadata['selected_total'] = selected_total
             save_job_metadata(job_id, metadata)
         
-        print(f"[Job {job_id}] PDF regenerated with {len(processed_receipts)} selected receipts")
+        print(f"[Job {job_id}] PDF regenerated with {len(processed_receipts)} selected receipts, total: {CURRENCY_SYMBOL}{selected_total:.2f}")
         
-        return jsonify({'success': True})
+        return jsonify({
+            'success': True,
+            'selected_count': len(processed_receipts),
+            'selected_total': selected_total
+        })
     
     except Exception as e:
         print(f"Error regenerating PDF: {e}")
@@ -585,6 +607,8 @@ def recompute_selection():
                 available_receipts.append(receipt)
         
         print(f"[Job {job_id}] Recomputing selection from {len(available_receipts)} available receipts")
+        print(f"[Job {job_id}] Selected indices from user: {selected_indices}")
+        print(f"[Job {job_id}] Available receipts amounts: {[r['amount'] for r in available_receipts]}")
         print(f"[Job {job_id}] Target amount: {CURRENCY_SYMBOL}{target_amount}")
         
         # Run selection algorithm on the available receipts
@@ -602,6 +626,7 @@ def recompute_selection():
         selected_total = sum(r['amount'] for r in selected_receipts)
         
         print(f"[Job {job_id}] Optimal selection: {len(selected_receipts)} receipts, total: {CURRENCY_SYMBOL}{selected_total:.2f}")
+        print(f"[Job {job_id}] Optimal indices: {optimal_indices}")
         
         # Update session with new selection
         session['selected_indices'] = optimal_indices

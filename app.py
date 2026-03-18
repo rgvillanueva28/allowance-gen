@@ -22,6 +22,9 @@ from pdf_generator import generate_pdf_from_receipts
 from config import CURRENCY_SYMBOL, MAX_OVERAGE_ALLOWED
 
 
+# Application version for cache-busting
+APP_VERSION = '1.0.1'
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
@@ -37,6 +40,31 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Create necessary directories
 UPLOAD_FOLDER.mkdir(exist_ok=True)
 OUTPUT_FOLDER.mkdir(exist_ok=True)
+
+
+# Context processor to pass app version to all templates
+@app.context_processor
+def inject_version():
+    """Inject app version into templates for cache-busting."""
+    return {'app_version': APP_VERSION}
+
+
+# Add cache control headers to prevent stale content
+@app.after_request
+def add_cache_headers(response):
+    """Add cache control headers for different file types."""
+    if request.path.startswith('/static/'):
+        # Static files (CSS, JS, images): cache for 1 year, but revalidate
+        response.cache_control.max_age = 31536000  # 1 year
+        response.cache_control.public = True
+    else:
+        # HTML pages: don't cache, always revalidate
+        response.cache_control.no_cache = True
+        response.cache_control.no_store = True
+        response.cache_control.must_revalidate = True
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
 
 
 def allowed_file(filename):

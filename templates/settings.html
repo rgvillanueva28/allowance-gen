@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Receipt Processing{% endblock %}
+
+{% block content %}
+<div class="upload-section">
+    <div class="header-section">
+        <h2>⚙️ Settings</h2>
+        <p class="subtitle">Configure your name to personalize generated file names</p>
+    </div>
+
+    <div class="content-card">
+        <h3>📄 Document Format</h3>
+        <p>Generated files will be named using the following format:</p>
+        <div class="format-preview" id="formatPreview">
+            <code>{{ preview }}</code>
+        </div>
+    </div>
+
+    <form action="{{ url_for('settings') }}" method="post" id="settingsForm">
+        <div class="form-group">
+            <label for="first_name">First Name</label>
+            <input
+                type="text"
+                id="first_name"
+                name="first_name"
+                value="{{ settings.first_name }}"
+                placeholder="e.g. John"
+                maxlength="50"
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="last_name">Last Name</label>
+            <input
+                type="text"
+                id="last_name"
+                name="last_name"
+                value="{{ settings.last_name }}"
+                placeholder="e.g. Doe"
+                maxlength="50"
+            >
+        </div>
+
+        <div class="content-card" style="margin-bottom: 1.5rem;">
+            <h3>🔍 Preview</h3>
+            <p>Your download will be named:</p>
+            <div class="format-preview" id="livePreview">
+                <code id="previewText">{{ preview }}.pdf</code>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">
+            <span class="btn-icon">💾</span>
+            Save Settings
+        </button>
+    </form>
+</div>
+
+<style>
+.format-preview {
+    background: #f4f4f8;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+}
+.format-preview code {
+    font-family: monospace;
+    color: #333;
+    word-break: break-all;
+}
+</style>
+
+<script>
+    const months = ["January","February","March","April","May","June",
+                    "July","August","September","October","November","December"];
+    const now = new Date();
+    const month = months[now.getMonth()];
+    const year = now.getFullYear();
+
+    function updatePreview() {
+        const first = document.getElementById('first_name').value.trim() || 'FirstName';
+        const last = document.getElementById('last_name').value.trim() || 'LastName';
+        const name = first + '_' + last + ' ' + month + ' Receipts ' + year;
+        document.getElementById('previewText').textContent = name + '.pdf';
+    }
+
+    document.getElementById('first_name').addEventListener('input', updatePreview);
+    document.getElementById('last_name').addEventListener('input', updatePreview);
+
+    // Init
+    updatePreview();
+</script>
+{% endblock %}

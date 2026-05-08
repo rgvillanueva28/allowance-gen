@@ -338,11 +338,18 @@ def download():
     if not pdf_path or not Path(pdf_path).exists():
         flash('PDF file not found.', 'error')
         return redirect(url_for('index'))
-    
+
+    job_id = session.get('job_id')
+    created_at = None
+    if job_id:
+        metadata = load_job_metadata(job_id)
+        if metadata:
+            created_at = metadata.get('created_at')
+    download_name = build_download_name(created_at=created_at) + '.pdf'
     return send_file(
         pdf_path,
         as_attachment=True,
-        download_name=f'receipts_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf',
+        download_name=download_name,
         mimetype='application/pdf'
     )
 
@@ -962,6 +969,78 @@ def delete_job(job_id):
         flash(f'Error deleting job: {str(e)}', 'error')
     
     return redirect(url_for('history'))
+
+
+SETTINGS_FILE = Path('settings.json')
+
+
+def load_settings():
+    """Load user settings from settings.json."""
+    defaults = {'first_name': '', 'last_name': ''}
+    try:
+        if SETTINGS_FILE.exists():
+            with open(SETTINGS_FILE, 'r') as f:
+                data = json.load(f)
+                defaults.update({k: data.get(k, defaults[k]) for k in defaults})
+    except Exception as e:
+        print(f"Error loading settings: {e}")
+    return defaults
+
+
+def save_settings(settings):
+    """Save user settings to settings.json."""
+    try:
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f, indent=2)
+    except Exception as e:
+        print(f"Error saving settings: {e}")
+
+
+def build_download_name(settings=None, created_at=None):
+    """Build the PDF download filename using the configured format."""
+    if settings is None:
+        settings = load_settings()
+    first = settings.get('first_name', '').strip()
+    last = settings.get('last_name', '').strip()
+    if created_at:
+        try:
+            dt = datetime.fromisoformat(created_at)
+        except (ValueError, TypeError):
+            dt = datetime.now()
+    else:
+        dt = datetime.now()
+    month = dt.strftime('%B')
+    year = dt.strftime('%Y')
+    if first or last:
+        name = f"{first}_{last} {month} Receipts {year}"
+    else:
+        name = f"receipts_{dt.strftime('%Y%m%d_%H%M%S')}"
+    return name
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+def settings():
+    """Display and save settings."""
+    if request.method == 'POST':
+        first_name = request.form.get('first_name', '').strip()
+        last_name = request.form.get('last_name', '').strip()
+        # Sanitize: allow only alphanumeric and common name characters
+        import re
+        allowed = re.compile(r"^[\w\s\-\']*$", re.UNICODE)
+        if not allowed.match(first_name) or not allowed.match(last_name):
+            flash('Names may only contain letters, numbers, spaces, hyphens, and apostrophes.', 'error')
+            return redirect(url_for('settings'))
+        save_settings({'first_name': first_name, 'last_name': last_name})
+        flash('Settings saved successfully.', 'success')
+        return redirect(url_for('settings'))
+
+    user_settings = load_settings()
+    month = datetime.now().strftime('%B')
+    year = datetime.now().strftime('%Y')
+    first = user_settings.get('first_name') or 'FirstName'
+    last = user_settings.get('last_name') or 'LastName'
+    preview = f"{first}_{last} {month} Receipts {year}"
+    return render_template('settings.html', settings=user_settings, preview=preview)
 
 
 @app.route('/about')

@@ -44,6 +44,171 @@
         </div>
     </footer>
 
+    <div id="appModalRoot" aria-hidden="true"></div>
+
+    <script>
+        // ===================== App Modal System =====================
+        const AppModal = (function() {
+            let currentClose = null;
+
+            const icons = {
+                info: 'ℹ️',
+                success: '✅',
+                warning: '⚠️',
+                error: '❌'
+            };
+
+            function buildBackdrop() {
+                const backdrop = document.createElement('div');
+                backdrop.className = 'app-modal-backdrop';
+                backdrop.id = 'appModalBackdrop';
+                return backdrop;
+            }
+
+            function buildDialog({ title, body, footer }) {
+                const dialog = document.createElement('div');
+                dialog.className = 'app-modal-dialog';
+                dialog.setAttribute('role', 'dialog');
+                dialog.setAttribute('aria-modal', 'true');
+
+                const header = document.createElement('div');
+                header.className = 'app-modal-header';
+                const titleEl = document.createElement('h3');
+                titleEl.className = 'app-modal-title';
+                titleEl.textContent = title || 'Notification';
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'app-modal-close';
+                closeBtn.innerHTML = '&times;';
+                closeBtn.setAttribute('aria-label', 'Close');
+                header.appendChild(titleEl);
+                header.appendChild(closeBtn);
+
+                const bodyEl = document.createElement('div');
+                bodyEl.className = 'app-modal-body';
+                if (typeof body === 'string') {
+                    bodyEl.textContent = body;
+                } else if (body instanceof HTMLElement) {
+                    bodyEl.appendChild(body);
+                } else if (body) {
+                    bodyEl.appendChild(body);
+                }
+
+                dialog.appendChild(header);
+                dialog.appendChild(bodyEl);
+                if (footer) dialog.appendChild(footer);
+
+                closeBtn.addEventListener('click', () => close());
+                return dialog;
+            }
+
+            function open({ title, body, footer, onClose }) {
+                close();
+                currentClose = onClose || null;
+                const backdrop = buildBackdrop();
+                const dialog = buildDialog({ title, body, footer });
+                backdrop.appendChild(dialog);
+                document.getElementById('appModalRoot').appendChild(backdrop);
+
+                requestAnimationFrame(() => backdrop.classList.add('visible'));
+
+                backdrop.addEventListener('click', (e) => {
+                    if (e.target === backdrop) close();
+                });
+
+                // Focus management
+                const focusable = dialog.querySelector('button, [href], input, select, textarea');
+                if (focusable) focusable.focus();
+
+                return backdrop;
+            }
+
+            function close() {
+                const backdrop = document.getElementById('appModalBackdrop');
+                if (backdrop) {
+                    backdrop.classList.remove('visible');
+                    setTimeout(() => backdrop.remove(), 200);
+                }
+                if (currentClose) currentClose();
+                currentClose = null;
+            }
+
+            // Single module-level Escape handler (no listener leaks)
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    const backdrop = document.getElementById('appModalBackdrop');
+                    if (backdrop) close();
+                }
+            });
+
+            function alert(message, opts = {}) {
+                opts = Object.assign({}, { title: 'Notification', okText: 'OK', type: 'info' }, opts);
+                return new Promise((resolve) => {
+                    const icon = document.createElement('div');
+                    icon.className = 'app-modal-icon ' + (opts.type || 'info');
+                    icon.textContent = icons[opts.type] || icons.info;
+
+                    const body = document.createElement('div');
+                    body.appendChild(icon);
+                    body.appendChild(document.createTextNode(message));
+
+                    const footer = document.createElement('div');
+                    footer.className = 'app-modal-footer';
+                    const okBtn = document.createElement('button');
+                    okBtn.className = 'btn btn-primary';
+                    okBtn.textContent = opts.okText;
+                    okBtn.addEventListener('click', () => { resolve(true); close(); });
+                    footer.appendChild(okBtn);
+
+                    const backdrop = open({
+                        title: opts.title,
+                        body,
+                        footer,
+                        onClose: () => resolve(false)
+                    });
+                    backdrop.querySelector('.app-modal-dialog').classList.add('alert');
+                });
+            }
+
+            function confirm(message, opts = {}) {
+                opts = Object.assign({}, { title: 'Confirm', okText: 'OK', cancelText: 'Cancel', danger: false, type: 'info' }, opts);
+                return new Promise((resolve) => {
+                    const icon = document.createElement('div');
+                    icon.className = 'app-modal-icon ' + (opts.type || 'info');
+                    icon.textContent = opts.danger ? '⚠️' : (icons[opts.type] || icons.info);
+
+                    const body = document.createElement('div');
+                    body.appendChild(icon);
+                    body.appendChild(document.createTextNode(message));
+
+                    const footer = document.createElement('div');
+                    footer.className = 'app-modal-footer';
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = 'btn btn-outline';
+                    cancelBtn.textContent = opts.cancelText;
+                    cancelBtn.addEventListener('click', () => { resolve(false); close(); });
+                    const okBtn = document.createElement('button');
+                    okBtn.className = 'btn btn-primary';
+                    okBtn.textContent = opts.okText;
+                    okBtn.addEventListener('click', () => { resolve(true); close(); });
+                    footer.appendChild(cancelBtn);
+                    footer.appendChild(okBtn);
+
+                    const backdrop = open({
+                        title: opts.title,
+                        body,
+                        footer,
+                        onClose: () => resolve(false)
+                    });
+                    const dlg = backdrop.querySelector('.app-modal-dialog');
+                    dlg.classList.add('confirm');
+                    if (opts.danger) dlg.classList.add('danger');
+                });
+            }
+
+            return { open, close, alert, confirm };
+        })();
+    </script>
+
     <script>
         // Auto-hide alerts after 5 seconds
         setTimeout(() => {

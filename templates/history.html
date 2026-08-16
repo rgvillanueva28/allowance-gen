@@ -22,22 +22,33 @@
             </div>
 
             <div class="job-stats">
-                <div class="stat-item">
-                    <span class="stat-label">Total Receipts</span>
-                    <span class="stat-value">{{ job.total_receipts }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Selected</span>
-                    <span class="stat-value">{{ job.selected_count }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Target Amount</span>
-                    <span class="stat-value">₱{{ "%.2f"|format(job.target_amount) }}</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Total</span>
-                    <span class="stat-value highlight">₱{{ "%.2f"|format(job.selected_total) }}</span>
-                </div>
+                {% if job.status == 'processing' %}
+                    <div class="stat-item">
+                        <span class="stat-label">Status</span>
+                        <span class="stat-value">⏳ Processing...</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Target Amount</span>
+                        <span class="stat-value">{{ currency_symbol }}{{ "%.2f"|format(job.target_amount) }}</span>
+                    </div>
+                {% else %}
+                    <div class="stat-item">
+                        <span class="stat-label">Total Receipts</span>
+                        <span class="stat-value">{{ job.total_receipts }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Selected</span>
+                        <span class="stat-value">{{ job.selected_count }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Target Amount</span>
+                        <span class="stat-value">{{ currency_symbol }}{{ "%.2f"|format(job.target_amount) }}</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total</span>
+                        <span class="stat-value highlight">{{ currency_symbol }}{{ "%.2f"|format(job.selected_total) }}</span>
+                    </div>
+                {% endif %}
             </div>
 
             <div class="job-preview">
@@ -57,17 +68,38 @@
             </div>
 
             <div class="job-actions">
-                <a href="{{ url_for('load_job', job_id=job.job_id) }}" class="btn btn-primary btn-sm">
-                    <span class="btn-icon">📂</span>
-                    Load Job
-                </a>
-                <form method="POST" action="{{ url_for('delete_job', job_id=job.job_id) }}" 
-                      onsubmit="return confirm('Are you sure you want to delete this job?');" style="display: inline;">
-                    <button type="submit" class="btn btn-danger btn-sm">
+                {% if job.status == 'processing' %}
+                    <button class="btn btn-primary btn-sm" disabled title="Job is still processing">
+                        <span class="btn-icon">⏳</span>
+                        Processing...
+                    </button>
+                    <button class="btn btn-danger btn-sm" disabled title="Cannot delete while processing">
                         <span class="btn-icon">🗑️</span>
                         Delete
                     </button>
-                </form>
+                {% elif job.status == 'failed' %}
+                    <button class="btn btn-primary btn-sm" disabled title="This job failed to process">
+                        <span class="btn-icon">⚠️</span>
+                        Failed
+                    </button>
+                    <form method="POST" action="{{ url_for('delete_job', job_id=job.job_id) }}">
+                        <button type="submit" class="btn btn-danger btn-sm" id="delete-btn-{{ job.job_id }}">
+                            <span class="btn-icon">🗑️</span>
+                            Delete
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="{{ url_for('load_job', job_id=job.job_id) }}" class="btn btn-primary btn-sm">
+                        <span class="btn-icon">📂</span>
+                        Load Job
+                    </a>
+                    <form method="POST" action="{{ url_for('delete_job', job_id=job.job_id) }}">
+                        <button type="submit" class="btn btn-danger btn-sm" id="delete-btn-{{ job.job_id }}">
+                            <span class="btn-icon">🗑️</span>
+                            Delete
+                        </button>
+                    </form>
+                {% endif %}
             </div>
 
             <div class="job-meta">
@@ -153,6 +185,14 @@
         background: rgba(76, 175, 80, 0.9);
     }
 
+    .job-status.processing {
+        background: rgba(255, 152, 0, 0.95);
+    }
+
+    .job-status.failed {
+        background: rgba(244, 67, 54, 0.9);
+    }
+
     .job-stats {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -227,10 +267,36 @@
         gap: 1rem;
     }
 
-    .btn-sm {
-        padding: 0.5rem 1rem;
-        font-size: 0.9rem;
+    .job-actions > a,
+    .job-actions > form {
         flex: 1;
+        display: flex;
+        min-width: 0;
+    }
+
+    .job-actions form {
+        background: transparent;
+        padding: 0;
+        border-radius: 0;
+        box-shadow: none;
+        margin: 0;
+        margin-bottom: 0;
+    }
+
+    .job-actions .btn-sm {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+        width: 100%;
+        margin: 0;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+    }
+
+    .job-actions .btn-sm .btn-icon {
+        font-size: 1rem;
     }
 
     .btn-danger {
@@ -317,4 +383,20 @@
         }
     }
 </style>
+
+<script>
+    // Delete confirmation using app-style modal
+    document.querySelectorAll('form[action*="delete-job"]').forEach(form => {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const confirmed = await AppModal.confirm(
+                'Are you sure you want to permanently delete this job? This cannot be undone.',
+                { title: 'Delete Job', okText: 'Delete', cancelText: 'Cancel', danger: true, type: 'warning' }
+            );
+            if (confirmed) {
+                this.submit();
+            }
+        });
+    });
+</script>
 {% endblock %}

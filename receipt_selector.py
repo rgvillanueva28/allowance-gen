@@ -2,7 +2,12 @@
 Receipt Selection Module
 Selects receipts to match a target amount using various strategies.
 """
-from config import CURRENCY_SYMBOL, MAX_OVERAGE_ALLOWED, EXACT_MATCH_TOLERANCE
+from config import CURRENCY_SYMBOL, MAX_OVERAGE_ALLOWED, EXACT_MATCH_TOLERANCE, get_currency_symbol, get_max_overage
+
+
+def _symbol():
+    """Return the configured currency symbol (from Settings when available)."""
+    return get_currency_symbol() or CURRENCY_SYMBOL
 
 
 def select_receipts_by_target(receipts, target_amount, tolerance=None, max_overage=None):
@@ -34,7 +39,7 @@ def select_receipts_by_target(receipts, target_amount, tolerance=None, max_overa
     if tolerance is None:
         tolerance = EXACT_MATCH_TOLERANCE
     if max_overage is None:
-        max_overage = MAX_OVERAGE_ALLOWED
+        max_overage = get_max_overage()
     
     # Sort receipts by amount (largest first)
     sorted_receipts = sorted(receipts, key=lambda r: r['amount'], reverse=True)
@@ -42,14 +47,14 @@ def select_receipts_by_target(receipts, target_amount, tolerance=None, max_overa
     # Strategy 1: Try to find an exact match or very close match
     selected = find_exact_match(sorted_receipts, target_amount, tolerance)
     if selected:
-        print(f"  Found exact match (within {CURRENCY_SYMBOL}{tolerance})")
+        print(f"  Found exact match (within {_symbol()}{tolerance})")
         return selected
     
     # Strategy 2: Find best combination without exceeding target
     selected = find_best_fit_subset(sorted_receipts, target_amount)
     if selected:
         total = sum(r['amount'] for r in selected)
-        print(f"  Found best fit without exceeding target ({CURRENCY_SYMBOL}{total:.2f})")
+        print(f"  Found best fit without exceeding target ({_symbol()}{total:.2f})")
         return selected
     
     # Strategy 3: Find closest match (may exceed target up to max_overage)
@@ -58,9 +63,9 @@ def select_receipts_by_target(receipts, target_amount, tolerance=None, max_overa
         total = sum(r['amount'] for r in selected)
         diff = abs(total - target_amount)
         if total > target_amount:
-            print(f"  Found closest match ({CURRENCY_SYMBOL}{total:.2f}, exceeds by {CURRENCY_SYMBOL}{diff:.2f})")
+            print(f"  Found closest match ({_symbol()}{total:.2f}, exceeds by {_symbol()}{diff:.2f})")
         else:
-            print(f"  Found closest match ({CURRENCY_SYMBOL}{total:.2f}, under by {CURRENCY_SYMBOL}{diff:.2f})")
+            print(f"  Found closest match ({_symbol()}{total:.2f}, under by {_symbol()}{diff:.2f})")
         return selected
     
     return []

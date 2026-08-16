@@ -6,7 +6,7 @@
 <div class="upload-section">
     <div class="header-section">
         <h2>⚙️ Settings</h2>
-        <p class="subtitle">Configure your name to personalize generated file names</p>
+        <p class="subtitle">Configure application preferences</p>
     </div>
 
     <div class="content-card">
@@ -18,28 +18,131 @@
     </div>
 
     <form action="{{ url_for('settings') }}" method="post" id="settingsForm">
-        <div class="form-group">
-            <label for="first_name">First Name</label>
-            <input
-                type="text"
-                id="first_name"
-                name="first_name"
-                value="{{ settings.first_name }}"
-                placeholder="e.g. John"
-                maxlength="50"
-            >
+        <div class="settings-section">
+            <div class="settings-header">
+                <h3>👤 Personal Information</h3>
+                <p>Used to personalize generated file names</p>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="first_name">First Name</label>
+                    <input
+                        type="text"
+                        id="first_name"
+                        name="first_name"
+                        value="{{ settings.first_name }}"
+                        placeholder="e.g. John"
+                        maxlength="50"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="last_name">Last Name</label>
+                    <input
+                        type="text"
+                        id="last_name"
+                        name="last_name"
+                        value="{{ settings.last_name }}"
+                        placeholder="e.g. Doe"
+                        maxlength="50"
+                    >
+                </div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="last_name">Last Name</label>
-            <input
-                type="text"
-                id="last_name"
-                name="last_name"
-                value="{{ settings.last_name }}"
-                placeholder="e.g. Doe"
-                maxlength="50"
-            >
+        <div class="settings-section">
+            <div class="settings-header">
+                <h3>🤖 AI Configuration</h3>
+                <p>Google Gemini model used for receipt detection and amount extraction</p>
+            </div>
+
+            <div class="info-banner settings-banner">
+                🔑 Your Gemini API key is read from the <code>.env</code> file
+                (<code>GEMINI_API_KEY</code>). It is never stored in Settings.
+            </div>
+
+            <div class="form-group">
+                <label for="gemini_model">Gemini Model</label>
+                <input
+                    type="text"
+                    id="gemini_model"
+                    name="gemini_model"
+                    value="{{ settings.gemini_model }}"
+                    placeholder="gemini-3-flash-preview"
+                    maxlength="100"
+                >
+                <p class="help-text">Common models: gemini-3-flash-preview, gemini-2.0-flash-exp, gemini-1.5-pro, gemini-1.5-flash</p>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-header">
+                <h3>💱 Currency Settings</h3>
+                <p>Symbol, code, and name used throughout the application</p>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group form-group-small">
+                    <label for="currency_symbol">Currency Symbol</label>
+                    <input
+                        type="text"
+                        id="currency_symbol"
+                        name="currency_symbol"
+                        value="{{ settings.currency_symbol }}"
+                        placeholder="₱"
+                        maxlength="4"
+                    >
+                    <p class="help-text">e.g. ₱, $, €, £</p>
+                </div>
+
+                <div class="form-group form-group-small">
+                    <label for="currency_code">Currency Code</label>
+                    <input
+                        type="text"
+                        id="currency_code"
+                        name="currency_code"
+                        value="{{ settings.currency_code }}"
+                        placeholder="PHP"
+                        maxlength="3"
+                    >
+                    <p class="help-text">3-letter code, e.g. PHP, USD, EUR</p>
+                </div>
+
+                <div class="form-group form-group-small">
+                    <label for="currency_name">Currency Name</label>
+                    <input
+                        type="text"
+                        id="currency_name"
+                        name="currency_name"
+                        value="{{ settings.currency_name }}"
+                        placeholder="Philippine Peso"
+                        maxlength="50"
+                    >
+                    <p class="help-text">e.g. Philippine Peso, US Dollar</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <div class="settings-header">
+                <h3>🎯 Receipt Selection</h3>
+                <p>How closely the selection may exceed your target amount</p>
+            </div>
+
+            <div class="form-group form-group-small">
+                <label for="max_overage">Max Overage ({{ settings.currency_symbol }})</label>
+                <input
+                    type="number"
+                    id="max_overage"
+                    name="max_overage"
+                    value="{{ settings.max_overage }}"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="100"
+                >
+                <p class="help-text">Maximum amount the selected total may exceed your target</p>
+            </div>
         </div>
 
         <div class="content-card" style="margin-bottom: 1.5rem;">
@@ -70,6 +173,68 @@
     font-family: monospace;
     color: #333;
     word-break: break-all;
+}
+
+.settings-section {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+}
+
+.settings-header h3 {
+    margin: 0 0 0.25rem 0;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+}
+
+.settings-header p {
+    margin: 0 0 1rem 0;
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+.settings-banner {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border-left: 4px solid #2196F3;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    color: #424242;
+}
+
+.settings-banner code {
+    background: rgba(0, 0, 0, 0.08);
+    padding: 0.1rem 0.3rem;
+    border-radius: 4px;
+    font-family: monospace;
+}
+
+.form-row {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.form-row .form-group {
+    flex: 1;
+    min-width: 180px;
+}
+
+.form-group-small {
+    flex: 0 0 200px !important;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        flex-direction: column;
+    }
+    .form-group-small {
+        flex: 1 !important;
+    }
 }
 </style>
 

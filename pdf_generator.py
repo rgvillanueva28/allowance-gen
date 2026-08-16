@@ -9,7 +9,12 @@ from reportlab.lib.utils import ImageReader
 from datetime import datetime
 from PIL import Image
 import io
-from config import CURRENCY_SYMBOL
+from config import CURRENCY_SYMBOL, get_currency_symbol
+
+
+def _symbol():
+    """Return the configured currency symbol (from Settings when available)."""
+    return get_currency_symbol() or CURRENCY_SYMBOL
 
 
 def generate_pdf_from_receipts(receipts, output_path, page_size=letter):
@@ -73,7 +78,7 @@ def add_title_page(c, receipts, page_width, page_height, margin):
     c.setFont("Helvetica", 14)
     info_lines = [
         f"Total Receipts: {len(receipts)}",
-        f"Total Amount: {CURRENCY_SYMBOL}{total_amount:.2f}",
+        f"Total Amount: {_symbol()}{total_amount:.2f}",
     ]
     
     for line in info_lines:
@@ -170,7 +175,7 @@ def add_summary_page(c, receipts, page_width, page_height, margin):
             source = "..." + source[-42:]
         c.drawString(margin + 0.5*inch, y_pos, source)
         
-        amount_str = f"{CURRENCY_SYMBOL}{receipt['amount']:.2f}"
+        amount_str = f"{_symbol()}{receipt['amount']:.2f}"
         c.drawString(margin + 4*inch, y_pos, amount_str)
         
         total += receipt['amount']
@@ -184,4 +189,4 @@ def add_summary_page(c, receipts, page_width, page_height, margin):
     y_pos -= 0.3*inch
     c.setFont("Helvetica-Bold", 12)
     c.drawString(margin + 3.2*inch, y_pos, "Total:")
-    c.drawString(margin + 4*inch, y_pos, f"{CURRENCY_SYMBOL}{total:.2f}")
+    c.drawString(margin + 4*inch, y_pos, f"{_symbol()}{total:.2f}")

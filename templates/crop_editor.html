@@ -22,7 +22,7 @@
                          alt="{{ receipt.id }}">
                 </div>
                 <div class="receipt-info">
-                    <strong>₱{{ "%.2f"|format(receipt.amount) }}</strong>
+                    <strong>{{ currency_symbol }}{{ "%.2f"|format(receipt.amount) }}</strong>
                     <small>{{ receipt.id }}</small>
                 </div>
             </div>
@@ -625,10 +625,10 @@
             if (result.success) {
                 window.location.href = '/results';
             } else {
-                alert('Error: ' + result.error);
+                await AppModal.alert('Error: ' + result.error, { title: 'Save Failed', type: 'error' });
             }
         } catch (error) {
-            alert('Error saving crops: ' + error);
+            await AppModal.alert('Error saving crops: ' + error, { title: 'Save Failed', type: 'error' });
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<span class="btn-icon">💾</span> Save & Generate PDF';

@@ -464,6 +464,12 @@ button:disabled {
     font-weight: 700;
 }
 
+.result-denominator {
+    font-size: 1.1rem;
+    font-weight: 500;
+    opacity: 0.7;
+}
+
 /* Action Buttons */
 .action-buttons {
     display: flex;
@@ -756,5 +762,204 @@ footer {
         max-width: 1400px;
     }
     
-    .images-grid {
+.images-grid {
         grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* ===================== App Modal ===================== */
+.app-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.app-modal-backdrop.visible {
+    opacity: 1;
+}
+
+.app-modal-dialog {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    max-width: 90vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    transform: translateY(20px) scale(0.95);
+    transition: transform 0.2s ease;
+    overflow: hidden;
+}
+
+.app-modal-backdrop.visible .app-modal-dialog {
+    transform: translateY(0) scale(1);
+}
+
+.app-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--light-bg);
+    flex-shrink: 0;
+}
+
+.app-modal-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+}
+
+.app-modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: var(--text-light);
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.app-modal-close:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: var(--text-dark);
+}
+
+.app-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+    color: var(--text-dark);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.app-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    background: var(--light-bg);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.app-modal-footer .btn {
+    margin: 0;
+    padding: 0.6rem 1.4rem;
+}
+
+.app-modal-icon {
+    text-align: center;
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.app-modal-icon.success { color: var(--secondary-color); }
+.app-modal-icon.warning { color: var(--warning-color); }
+.app-modal-icon.error { color: var(--danger-color); }
+.app-modal-icon.info { color: var(--primary-color); }
+
+.app-modal-dialog.confirm .app-modal-footer .btn-primary {
+    background: var(--primary-color);
+}
+
+.app-modal-dialog.confirm.danger .app-modal-footer .btn-primary {
+    background: var(--danger-color);
+}
+
+.app-modal-dialog.confirm.danger .app-modal-footer .btn-primary:hover {
+    background: #d32f2f;
+}
+
+@media (max-width: 480px) {
+    .app-modal-footer {
+        flex-direction: column-reverse;
+    }
+    .app-modal-footer .btn {
+        width: 100%;
+    }
+}
+
+/* ===================== Image Viewer ===================== */
+.viewer-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    min-height: 300px;
+    max-height: 70vh;
+    width: 80vw;
+    max-width: 1200px;
+}
+
+.viewer-stage {
+    position: relative;
+    width: 100%;
+    max-width: 80vw;
+    height: 60vh;
+    overflow: hidden;
+    background: #111;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+    touch-action: none;
+}
+
+.viewer-stage.panning {
+    cursor: grabbing;
+}
+
+.viewer-stage img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+    transition: transform 0.15s ease;
+}
+
+.viewer-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.viewer-controls .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.95rem;
+    margin: 0;
+}
+
+.viewer-zoom-indicator {
+    font-weight: 600;
+    color: var(--text-dark);
+    min-width: 60px;
+    text-align: center;
+    font-size: 0.95rem;
+}
+
+@media (max-width: 480px) {
+    .viewer-stage {
+        height: 50vh;
+    }
+}

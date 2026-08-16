@@ -32,6 +32,8 @@ export GEMINI_API_KEY="your-api-key-here"
 **Permanent Setup (Recommended):**
 Add to your system environment variables or create a `.env` file in the project directory.
 
+> **Note:** Your API key is always kept in `.env` — never store it in the app's Settings page. The Settings page only lets you choose the Gemini **model** and currency preferences.
+
 ## Installation
 
 1. **Install Python dependencies:**
@@ -66,6 +68,11 @@ Add to your system environment variables or create a `.env` file in the project 
    - Enter your target amount
    - Click "Process Receipts"
    - View results and download PDF
+
+4. **Configure settings (optional):**
+   - Visit **Settings** in the navigation menu
+   - Set your Gemini model, currency symbol/code/name, and max overage
+   - Click "Save Settings"
 
 ## Using the Command Line
 API Key Not Found

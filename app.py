@@ -19,14 +19,14 @@ load_dotenv()
 from gemini_processor import process_receipts_with_gemini
 from receipt_selector import select_receipts_by_target
 from pdf_generator import generate_pdf_from_receipts
-from config import CURRENCY_SYMBOL, MAX_OVERAGE_ALLOWED
+from config import CURRENCY_SYMBOL, MAX_OVERAGE_ALLOWED, get_currency_symbol, get_max_overage
 
 
 # Application version for cache-busting
-APP_VERSION = '1.0.1'
+APP_VERSION = '1.0.2'
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.secret_key = os.environ.get('SECRET_KEY', 'please-change-me-in-prod-okay-zzz')
 
 # Configuration
 UPLOAD_FOLDER = Path('uploads')
@@ -47,6 +47,13 @@ OUTPUT_FOLDER.mkdir(exist_ok=True)
 def inject_version():
     """Inject app version into templates for cache-busting."""
     return {'app_version': APP_VERSION}
+
+
+@app.context_processor
+def inject_currency():
+    """Inject currency symbol into templates from settings."""
+    settings = load_settings()
+    return {'currency_symbol': settings.get('currency_symbol', CURRENCY_SYMBOL)}
 
 
 # Add cache control headers to prevent stale content
@@ -190,11 +197,36 @@ def upload_files():
             flash('No valid image files uploaded.', 'error')
             return redirect(url_for('index'))
         
+        # Create output directory and save a "processing" metadata skeleton
+        # so the job appears in History while Gemini is still working.
+        output_dir = OUTPUT_FOLDER / job_id
+        output_dir.mkdir(exist_ok=True)
+        receipts_dir = output_dir / 'receipts'
+        receipts_dir.mkdir(exist_ok=True)
+        originals_dir = output_dir / 'originals'
+        originals_dir.mkdir(exist_ok=True)
+
+        settings = load_settings()
+        processing_metadata = {
+            'created_at': datetime.now().isoformat(),
+            'total_receipts': 0,
+            'selected_count': 0,
+            'target_amount': float(target_amount),
+            'selected_total': 0.0,
+            'receipt_data': [],
+            'selected_indices': [],
+            'pdf_path': str(output_dir / 'selected_receipts.pdf'),
+            'status': 'processing'
+        }
+        save_job_metadata(job_id, processing_metadata)
+        print(f"[Job {job_id}] Saved processing metadata skeleton to history")
+        
         # Process receipts with Gemini AI
         print(f"\n[Job {job_id}] Processing {len(uploaded_paths)} file(s) with Gemini AI...")
         
-        # Process all images at once with Gemini
-        receipts_with_amounts = process_receipts_with_gemini(uploaded_paths)
+        # Process all images at once with Gemini, using configured model
+        gemini_model = settings.get('gemini_model', 'gemini-3-flash-preview')
+        receipts_with_amounts = process_receipts_with_gemini(uploaded_paths, model=gemini_model)
         print(f"[Job {job_id}] Processed {len(receipts_with_amounts)} receipt(s)")
         
         # Create a mapping of file_id to uploaded file path for originals
@@ -204,18 +236,13 @@ def upload_files():
         
         if not receipts_with_amounts:
             flash('No receipts detected or amounts could not be extracted.', 'error')
+            # Mark the job as failed so it doesn't linger as "processing" in history
+            metadata = load_job_metadata(job_id)
+            if metadata:
+                metadata['status'] = 'failed'
+                metadata['error'] = 'No receipts detected or amounts could not be extracted.'
+                save_job_metadata(job_id, metadata)
             return redirect(url_for('index'))
-        
-        # Generate PDF
-        output_dir = OUTPUT_FOLDER / job_id
-        output_dir.mkdir(exist_ok=True)
-        
-        receipts_dir = output_dir / 'receipts'
-        receipts_dir.mkdir(exist_ok=True)
-        
-        # Create originals directory to preserve source images
-        originals_dir = output_dir / 'originals'
-        originals_dir.mkdir(exist_ok=True)
         
         # Save ALL receipt images (not just selected ones)
         all_receipt_data = []
@@ -255,7 +282,10 @@ def upload_files():
             })
         
         # Now select optimal receipts based on target amount
-        selected_receipts = select_receipts_by_target(receipts_with_amounts, target_amount)
+        selected_receipts = select_receipts_by_target(
+            receipts_with_amounts, target_amount,
+            max_overage=float(settings.get('max_overage', MAX_OVERAGE_ALLOWED))
+        )
         
         if not selected_receipts:
             flash('Could not select receipts to match target amount.', 'warning')
@@ -273,7 +303,7 @@ def upload_files():
         
         total_selected = sum(r['amount'] for r in selected_receipts)
         print(f"[Job {job_id}] Detected {len(receipts_with_amounts)} receipt(s)")
-        print(f"[Job {job_id}] Selected {len(selected_receipts)} receipt(s), total: {CURRENCY_SYMBOL}{total_selected:.2f}")
+        print(f"[Job {job_id}] Selected {len(selected_receipts)} receipt(s), total: {get_currency_symbol()}{total_selected:.2f}")
         print(f"[Job {job_id}] Selected indices: {selected_indices}")
         
         # Generate PDF with selected receipts only
@@ -291,9 +321,10 @@ def upload_files():
         session['receipt_data'] = all_receipt_data  # Store ALL receipts
         session['selected_indices'] = selected_indices  # Store which are selected
         
-        # Save job metadata for persistence
+        # Save job metadata for persistence (preserve original created_at from skeleton)
+        processing_metadata = load_job_metadata(job_id) or {}
         metadata = {
-            'created_at': datetime.now().isoformat(),
+            'created_at': processing_metadata.get('created_at', datetime.now().isoformat()),
             'total_receipts': len(receipts_with_amounts),
             'selected_count': len(selected_receipts),
             'target_amount': float(target_amount),
@@ -310,6 +341,14 @@ def upload_files():
     except Exception as e:
         print(f"Error processing receipts: {e}")
         flash(f'Error processing receipts: {str(e)}', 'error')
+        # Mark any in-progress job as failed so it doesn't linger in history
+        if 'job_id' in locals() and job_id:
+            failed_metadata = load_job_metadata(job_id)
+            if failed_metadata and failed_metadata.get('status') == 'processing':
+                failed_metadata['status'] = 'failed'
+                failed_metadata['error'] = str(e)
+                failed_metadata['last_modified'] = datetime.now().isoformat()
+                save_job_metadata(job_id, failed_metadata)
         return redirect(url_for('index'))
 
 
@@ -421,7 +460,7 @@ def update_amount():
             metadata['last_modified'] = datetime.now().isoformat()
             save_job_metadata(job_id, metadata)
         
-        print(f"[Job {job_id}] Updated receipt {receipt_index}: {CURRENCY_SYMBOL}{old_amount:.2f} → {CURRENCY_SYMBOL}{new_amount:.2f}")
+        print(f"[Job {job_id}] Updated receipt {receipt_index}: {get_currency_symbol()}{old_amount:.2f} → {get_currency_symbol()}{new_amount:.2f}")
         
         return jsonify({
             'success': True,
@@ -502,19 +541,21 @@ def add_manual_receipt():
         # Update session
         session['receipt_data'] = receipt_data
         session['selected_count'] = len(receipt_data)
+        session['total_receipts'] = len(receipt_data)
         new_total = sum(r['amount'] for r in receipt_data)
         session['selected_total'] = new_total
         
         # Update metadata
         metadata = load_job_metadata(job_id)
         if metadata:
+            metadata['total_receipts'] = len(receipt_data)
             metadata['selected_count'] = len(receipt_data)
             metadata['selected_total'] = new_total
             metadata['receipt_data'] = receipt_data
             metadata['last_modified'] = datetime.now().isoformat()
             save_job_metadata(job_id, metadata)
         
-        print(f"[Job {job_id}] Manually added receipt: {CURRENCY_SYMBOL}{amount:.2f}")
+        print(f"[Job {job_id}] Manually added receipt: {get_currency_symbol()}{amount:.2f}")
         
         return jsonify({
             'success': True,
@@ -599,7 +640,7 @@ def regenerate_pdf():
             metadata['selected_total'] = selected_total
             save_job_metadata(job_id, metadata)
         
-        print(f"[Job {job_id}] PDF regenerated with {len(processed_receipts)} selected receipts, total: {CURRENCY_SYMBOL}{selected_total:.2f}")
+        print(f"[Job {job_id}] PDF regenerated with {len(processed_receipts)} selected receipts, total: {get_currency_symbol()}{selected_total:.2f}")
         
         return jsonify({
             'success': True,
@@ -644,23 +685,22 @@ def recompute_selection():
         print(f"[Job {job_id}] Recomputing selection from {len(available_receipts)} available receipts")
         print(f"[Job {job_id}] Selected indices from user: {selected_indices}")
         print(f"[Job {job_id}] Available receipts amounts: {[r['amount'] for r in available_receipts]}")
-        print(f"[Job {job_id}] Target amount: {CURRENCY_SYMBOL}{target_amount}")
+        print(f"[Job {job_id}] Target amount: {get_currency_symbol()}{target_amount}")
         
-        # Run selection algorithm on the available receipts
+# Run selection algorithm on the available receipts
         from receipt_selector import select_receipts_by_target
-        from config import MAX_OVERAGE_ALLOWED
-        
+
         selected_receipts = select_receipts_by_target(
             available_receipts, 
             target_amount,
-            max_overage=MAX_OVERAGE_ALLOWED
+            max_overage=get_max_overage()
         )
         
         # Get original indices of selected receipts
         optimal_indices = [r['original_index'] for r in selected_receipts]
         selected_total = sum(r['amount'] for r in selected_receipts)
         
-        print(f"[Job {job_id}] Optimal selection: {len(selected_receipts)} receipts, total: {CURRENCY_SYMBOL}{selected_total:.2f}")
+        print(f"[Job {job_id}] Optimal selection: {len(selected_receipts)} receipts, total: {get_currency_symbol()}{selected_total:.2f}")
         print(f"[Job {job_id}] Optimal indices: {optimal_indices}")
         
         # Update session with new selection
@@ -755,6 +795,7 @@ def remove_receipt():
         # Remove from session
         receipt_data.pop(index)
         session['receipt_data'] = receipt_data
+        session['total_receipts'] = len(receipt_data)
         
         # Update selected_indices: remove the deleted index and shift down indices > deleted index
         selected_indices = session.get('selected_indices', [])
@@ -771,6 +812,7 @@ def remove_receipt():
         # Update metadata
         metadata = load_job_metadata(job_id)
         if metadata:
+            metadata['total_receipts'] = len(receipt_data)
             metadata['receipt_count'] = len(receipt_data)
             metadata['receipt_data'] = receipt_data
             metadata['selected_indices'] = updated_indices
@@ -973,10 +1015,20 @@ def delete_job(job_id):
 
 SETTINGS_FILE = Path('settings.json')
 
+DEFAULT_SETTINGS = {
+    'first_name': '',
+    'last_name': '',
+    'gemini_model': 'gemini-3-flash-preview',
+    'currency_symbol': CURRENCY_SYMBOL,
+    'currency_code': 'PHP',
+    'currency_name': 'Philippine Peso',
+    'max_overage': MAX_OVERAGE_ALLOWED,
+}
+
 
 def load_settings():
     """Load user settings from settings.json."""
-    defaults = {'first_name': '', 'last_name': ''}
+    defaults = dict(DEFAULT_SETTINGS)
     try:
         if SETTINGS_FILE.exists():
             with open(SETTINGS_FILE, 'r') as f:
@@ -1022,15 +1074,53 @@ def build_download_name(settings=None, created_at=None):
 def settings():
     """Display and save settings."""
     if request.method == 'POST':
+        import re
         first_name = request.form.get('first_name', '').strip()
         last_name = request.form.get('last_name', '').strip()
         # Sanitize: allow only alphanumeric and common name characters
-        import re
         allowed = re.compile(r"^[\w\s\-\']*$", re.UNICODE)
         if not allowed.match(first_name) or not allowed.match(last_name):
             flash('Names may only contain letters, numbers, spaces, hyphens, and apostrophes.', 'error')
             return redirect(url_for('settings'))
-        save_settings({'first_name': first_name, 'last_name': last_name})
+
+        gemini_model = request.form.get('gemini_model', '').strip()
+        # Allow alphanumeric, dots, dashes, underscores, slashes (for full model paths)
+        if not re.match(r"^[\w\.\-\/]+$", gemini_model):
+            flash('Gemini model may only contain letters, numbers, dots, dashes, underscores, and slashes.', 'error')
+            return redirect(url_for('settings'))
+
+        currency_symbol = request.form.get('currency_symbol', '').strip()
+        if not currency_symbol or len(currency_symbol) > 4:
+            flash('Currency symbol must be 1-4 characters.', 'error')
+            return redirect(url_for('settings'))
+
+        currency_code = request.form.get('currency_code', '').strip().upper()
+        if not re.match(r"^[A-Z]{3}$", currency_code):
+            flash('Currency code must be exactly 3 letters (e.g. PHP).', 'error')
+            return redirect(url_for('settings'))
+
+        currency_name = request.form.get('currency_name', '').strip()
+        if not currency_name or not allowed.match(currency_name):
+            flash('Currency name may only contain letters, numbers, spaces, hyphens, and apostrophes.', 'error')
+            return redirect(url_for('settings'))
+
+        try:
+            max_overage = float(request.form.get('max_overage', 0))
+            if max_overage <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            flash('Max overage must be a positive number.', 'error')
+            return redirect(url_for('settings'))
+
+        save_settings({
+            'first_name': first_name,
+            'last_name': last_name,
+            'gemini_model': gemini_model,
+            'currency_symbol': currency_symbol,
+            'currency_code': currency_code,
+            'currency_name': currency_name,
+            'max_overage': max_overage,
+        })
         flash('Settings saved successfully.', 'success')
         return redirect(url_for('settings'))
 

@@ -11,15 +11,15 @@
         <div class="totals-summary">
             <div class="total-item">
                 <span class="total-label">Target:</span>
-                <span class="total-value">₱{{ "%.2f"|format(target_amount) }}</span>
+                <span class="total-value">{{ currency_symbol }}{{ "%.2f"|format(target_amount) }}</span>
             </div>
             <div class="total-item">
                 <span class="total-label">Selected Total:</span>
-                <span class="total-value highlight" id="current-total">₱{{ "%.2f"|format(selected_total) }}</span>
+                <span class="total-value highlight" id="current-total">{{ currency_symbol }}{{ "%.2f"|format(selected_total) }}</span>
             </div>
             <div class="total-item">
                 <span class="total-label">Difference:</span>
-                <span class="total-value" id="difference">₱{{ "%.2f"|format(selected_total - target_amount) }}</span>
+                <span class="total-value" id="difference">{{ currency_symbol }}{{ "%.2f"|format(selected_total - target_amount) }}</span>
             </div>
         </div>
         
@@ -48,13 +48,13 @@
                 <label for="checkbox-{{ loop.index0 }}" class="checkbox-label">Include</label>
             </div>
             <div class="image-wrapper">
-                <img src="{{ url_for('get_image', job_id=job_id, filename=receipt.filename) }}" alt="{{ receipt.id }}" loading="lazy">
-                <div class="amount-overlay" id="overlay-{{ loop.index0 }}">₱{{ "%.2f"|format(receipt.amount) }}</div>
+                <img src="{{ url_for('get_image', job_id=job_id, filename=receipt.filename) }}" alt="{{ receipt.id }}" loading="lazy" class="viewable-image">
+                <div class="amount-overlay" id="overlay-{{ loop.index0 }}">{{ currency_symbol }}{{ "%.2f"|format(receipt.amount) }}</div>
             </div>
             <div class="image-info">
                 <div class="receipt-details">
                     <div class="amount-edit-wrapper">
-                        <span class="receipt-amount" id="amount-display-{{ loop.index0 }}">Amount: ₱{{ "%.2f"|format(receipt.amount) }}</span>
+                        <span class="receipt-amount" id="amount-display-{{ loop.index0 }}">Amount: {{ currency_symbol }}{{ "%.2f"|format(receipt.amount) }}</span>
                         <button class="btn-edit-amount" onclick="editAmount({{ loop.index0 }})" title="Edit amount">✏️</button>
                     </div>
                     <div class="amount-input-wrapper" id="amount-input-{{ loop.index0 }}" style="display: none;">
@@ -85,7 +85,7 @@
                     <input type="file" id="manual-image" accept="image/*" required>
                 </div>
                 <div class="form-group">
-                    <label for="manual-amount">Amount (₱)</label>
+                    <label for="manual-amount">Amount ({{ currency_symbol }})</label>
                     <input type="number" id="manual-amount" step="0.01" min="0.01" placeholder="100.00" required>
                 </div>
                 <div class="form-group">
@@ -441,11 +441,193 @@
     const receipts = {{ receipts|tojson }};
     const jobId = "{{ job_id }}";
     const targetAmount = {{ target_amount }};
+    const currencySymbol = "{{ currency_symbol }}";
     let originalAmounts = {};
     
     // Store original amounts
     receipts.forEach((receipt, idx) => {
         originalAmounts[idx] = receipt.amount;
+    });
+
+    // ===================== Image Viewer =====================
+    const viewer = {
+        scale: 1,
+        posX: 0,
+        posY: 0,
+        img: null,
+        stage: null,
+        imgEl: null,
+        panning: false,
+        startX: 0,
+        startY: 0,
+        startPosX: 0,
+        startPosY: 0,
+        zoomIndicator: null
+    };
+
+    function openImageViewer(src) {
+        const stage = document.createElement('div');
+        stage.className = 'viewer-stage';
+
+        const imgEl = document.createElement('img');
+        imgEl.src = src;
+        imgEl.draggable = false;
+
+        const controls = document.createElement('div');
+        controls.className = 'viewer-controls';
+
+        const zoomOutBtn = document.createElement('button');
+        zoomOutBtn.className = 'btn btn-secondary';
+        zoomOutBtn.textContent = '−';
+        zoomOutBtn.title = 'Zoom out';
+        zoomOutBtn.addEventListener('click', () => zoomViewer(-0.25));
+
+        const zoomInBtn = document.createElement('button');
+        zoomInBtn.className = 'btn btn-secondary';
+        zoomInBtn.textContent = '+';
+        zoomInBtn.title = 'Zoom in';
+        zoomInBtn.addEventListener('click', () => zoomViewer(0.25));
+
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'btn btn-outline';
+        resetBtn.textContent = 'Reset';
+        resetBtn.title = 'Reset zoom';
+        resetBtn.addEventListener('click', resetViewer);
+
+        const indicator = document.createElement('span');
+        indicator.className = 'viewer-zoom-indicator';
+
+        controls.appendChild(zoomOutBtn);
+        controls.appendChild(indicator);
+        controls.appendChild(zoomInBtn);
+        controls.appendChild(resetBtn);
+
+        stage.appendChild(imgEl);
+
+        const container = document.createElement('div');
+        container.className = 'viewer-container';
+        container.appendChild(stage);
+        container.appendChild(controls);
+
+        viewer.stage = stage;
+        viewer.imgEl = imgEl;
+        viewer.img = new Image();
+        viewer.zoomIndicator = indicator;
+        viewer.scale = 1;
+        viewer.posX = 0;
+        viewer.posY = 0;
+
+        imgEl.onload = () => { applyViewerTransform(); };
+
+        AppModal.open({
+            title: 'Receipt Image',
+            body: container,
+            onClose: () => {
+                viewer.stage = null;
+                viewer.imgEl = null;
+                viewer.img = null;
+            }
+        });
+
+        // Wheel zoom
+        stage.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoomViewer(delta);
+        }, { passive: false });
+
+        // Mouse pan
+        stage.addEventListener('mousedown', (e) => {
+            if (viewer.scale <= 1) return;
+            viewer.panning = true;
+            viewer.startX = e.clientX;
+            viewer.startY = e.clientY;
+            viewer.startPosX = viewer.posX;
+            viewer.startPosY = viewer.posY;
+            stage.classList.add('panning');
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!viewer.panning || !viewer.stage) return;
+            viewer.posX = viewer.startPosX + (e.clientX - viewer.startX);
+            viewer.posY = viewer.startPosY + (e.clientY - viewer.startY);
+            applyViewerTransform();
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (viewer.panning) {
+                viewer.panning = false;
+                if (viewer.stage) viewer.stage.classList.remove('panning');
+            }
+        });
+
+        // Touch pan
+        stage.addEventListener('touchstart', (e) => {
+            if (viewer.scale <= 1) return;
+            const touch = e.touches[0];
+            viewer.panning = true;
+            viewer.startX = touch.clientX;
+            viewer.startY = touch.clientY;
+            viewer.startPosX = viewer.posX;
+            viewer.startPosY = viewer.posY;
+            e.preventDefault();
+        }, { passive: false });
+
+        stage.addEventListener('touchmove', (e) => {
+            if (!viewer.panning || !viewer.stage) return;
+            const touch = e.touches[0];
+            viewer.posX = viewer.startPosX + (touch.clientX - viewer.startX);
+            viewer.posY = viewer.startPosY + (touch.clientY - viewer.startY);
+            applyViewerTransform();
+            e.preventDefault();
+        }, { passive: false });
+
+        stage.addEventListener('touchend', () => {
+            viewer.panning = false;
+        });
+    }
+
+    function zoomViewer(delta) {
+        if (!viewer.imgEl) return;
+        viewer.scale = Math.min(5, Math.max(0.5, viewer.scale + delta));
+        applyViewerTransform();
+    }
+
+    function resetViewer() {
+        viewer.scale = 1;
+        viewer.posX = 0;
+        viewer.posY = 0;
+        applyViewerTransform();
+    }
+
+    function applyViewerTransform() {
+        if (!viewer.imgEl) return;
+        clampViewerPosition();
+        viewer.imgEl.style.transform = `translate(${viewer.posX}px, ${viewer.posY}px) scale(${viewer.scale})`;
+        if (viewer.zoomIndicator) {
+            viewer.zoomIndicator.textContent = Math.round(viewer.scale * 100) + '%';
+        }
+    }
+
+    function clampViewerPosition() {
+        if (!viewer.imgEl || !viewer.stage) return;
+        const dispW = viewer.imgEl.clientWidth;
+        const dispH = viewer.imgEl.clientHeight;
+        const stageW = viewer.stage.clientWidth;
+        const stageH = viewer.stage.clientHeight;
+        const maxPosX = Math.max(0, (dispW * viewer.scale - stageW) / 2);
+        const maxPosY = Math.max(0, (dispH * viewer.scale - stageH) / 2);
+        viewer.posX = Math.max(-maxPosX, Math.min(maxPosX, viewer.posX));
+        viewer.posY = Math.max(-maxPosY, Math.min(maxPosY, viewer.posY));
+    }
+
+    // Click image to open viewer (delegated so dynamically-added cards work too)
+    document.getElementById('images-grid').addEventListener('click', (e) => {
+        const img = e.target.closest('img.viewable-image');
+        if (img) {
+            openImageViewer(img.getAttribute('src'));
+        }
     });
     
     function editAmount(index) {
@@ -465,7 +647,10 @@
         const newAmount = parseFloat(document.getElementById(`amount-value-${index}`).value);
         
         if (isNaN(newAmount) || newAmount < 0) {
-            alert('Please enter a valid positive amount');
+            await AppModal.alert('Please enter a valid positive amount', {
+                title: 'Invalid Amount',
+                type: 'warning'
+            });
             return;
         }
         
@@ -481,8 +666,8 @@
             if (result.success) {
                 // Update display
                 originalAmounts[index] = newAmount;
-                document.getElementById(`amount-display-${index}`).textContent = `Amount: ₱${newAmount.toFixed(2)}`;
-                document.getElementById(`overlay-${index}`).textContent = `₱${newAmount.toFixed(2)}`;
+                document.getElementById(`amount-display-${index}`).textContent = `Amount: ${currencySymbol}${newAmount.toFixed(2)}`;
+                document.getElementById(`overlay-${index}`).textContent = `${currencySymbol}${newAmount.toFixed(2)}`;
                 
                 // Hide input, show display
                 cancelEdit(index);
@@ -490,17 +675,17 @@
                 // Update totals
                 updateTotals(result.new_total, result.target_amount);
             } else {
-                alert('Error: ' + result.error);
+                await AppModal.alert('Error: ' + result.error, { title: 'Update Failed', type: 'error' });
             }
         } catch (error) {
-            alert('Error updating amount: ' + error);
+            await AppModal.alert('Error updating amount: ' + error, { title: 'Update Failed', type: 'error' });
         }
     }
     
     function updateTotals(newTotal, target) {
-        document.getElementById('current-total').textContent = `₱${newTotal.toFixed(2)}`;
+        document.getElementById('current-total').textContent = `${currencySymbol}${newTotal.toFixed(2)}`;
         const diff = newTotal - target;
-        document.getElementById('difference').textContent = `₱${diff.toFixed(2)}`;
+        document.getElementById('difference').textContent = `${currencySymbol}${diff.toFixed(2)}`;
         
         // Update color based on difference
         const diffElem = document.getElementById('difference');
@@ -522,13 +707,13 @@
         const btn = document.getElementById('add-manual-btn');
         
         if (!fileInput.files[0]) {
-            alert('Please select an image');
+            await AppModal.alert('Please select an image', { title: 'Missing Image', type: 'warning' });
             return;
         }
         
         const amount = parseFloat(amountInput.value);
         if (isNaN(amount) || amount <= 0) {
-            alert('Please enter a valid amount');
+            await AppModal.alert('Please enter a valid amount', { title: 'Invalid Amount', type: 'warning' });
             return;
         }
         
@@ -564,12 +749,12 @@
                 receipts.push(result.receipt);
                 originalAmounts[result.new_count - 1] = result.receipt.amount;
                 
-                alert('Receipt added successfully!');
+                await AppModal.alert('Receipt added successfully!', { title: 'Receipt Added', type: 'success' });
             } else {
-                alert('Error: ' + result.error);
+                await AppModal.alert('Error: ' + result.error, { title: 'Add Failed', type: 'error' });
             }
         } catch (error) {
-            alert('Error adding receipt: ' + error);
+            await AppModal.alert('Error adding receipt: ' + error, { title: 'Add Failed', type: 'error' });
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<span class=\"btn-icon\">➕</span> Add Receipt';
@@ -585,13 +770,13 @@
                     <label for=\"checkbox-${index}\" class=\"checkbox-label\">Include</label>
                 </div>
                 <div class=\"image-wrapper\">
-                    <img src=\"/image/${jobId}/${receipt.filename}\" alt=\"${receipt.id}\" loading=\"lazy\">
-                    <div class=\"amount-overlay\" id=\"overlay-${index}\">₱${receipt.amount.toFixed(2)}</div>
+                    <img src=\"/image/${jobId}/${receipt.filename}\" alt=\"${receipt.id}\" loading=\"lazy\" class=\"viewable-image\">
+                    <div class=\"amount-overlay\" id=\"overlay-${index}\">${currencySymbol}${receipt.amount.toFixed(2)}</div>
                 </div>
                 <div class=\"image-info\">
                     <div class=\"receipt-details\">
                         <div class=\"amount-edit-wrapper\">
-                            <span class=\"receipt-amount\" id=\"amount-display-${index}\">Amount: ₱${receipt.amount.toFixed(2)}</span>
+                            <span class=\"receipt-amount\" id=\"amount-display-${index}\">Amount: ${currencySymbol}${receipt.amount.toFixed(2)}</span>
                             <button class=\"btn-edit-amount\" onclick=\"editAmount(${index})\" title=\"Edit amount\">✏️</button>
                         </div>
                         <div class=\"amount-input-wrapper\" id=\"amount-input-${index}\" style=\"display: none;\">
@@ -623,7 +808,10 @@
         });
         
         if (selectedIndices.length === 0) {
-            alert('Please select at least one receipt to include in the PDF');
+            await AppModal.alert('Please select at least one receipt to include in the PDF', {
+                title: 'No Selection',
+                type: 'warning'
+            });
             btn.disabled = false;
             btn.innerHTML = '<span class=\"btn-icon\">🔄</span> Regenerate PDF';
             return;
@@ -639,12 +827,15 @@
             const result = await response.json();
             
             if (result.success) {
-                alert(`PDF regenerated successfully! Included ${result.selected_count} receipt(s) totaling ₱${result.selected_total.toFixed(2)}`);
+                await AppModal.alert(`PDF regenerated successfully! Included ${result.selected_count} receipt(s) totaling ${currencySymbol}${result.selected_total.toFixed(2)}`, {
+                    title: 'PDF Generated',
+                    type: 'success'
+                });
             } else {
-                alert('Error: ' + result.error);
+                await AppModal.alert('Error: ' + result.error, { title: 'Generation Failed', type: 'error' });
             }
         } catch (error) {
-            alert('Error regenerating PDF: ' + error);
+            await AppModal.alert('Error regenerating PDF: ' + error, { title: 'Generation Failed', type: 'error' });
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<span class=\"btn-icon\">🔄</span> Regenerate PDF';
@@ -688,9 +879,9 @@
             selectedTotal += originalAmounts[index];
         });
         
-        document.getElementById('current-total').textContent = `₱${selectedTotal.toFixed(2)}`;
+        document.getElementById('current-total').textContent = `${currencySymbol}${selectedTotal.toFixed(2)}`;
         const diff = selectedTotal - targetAmount;
-        document.getElementById('difference').textContent = `₱${diff.toFixed(2)}`;
+        document.getElementById('difference').textContent = `${currencySymbol}${diff.toFixed(2)}`;
         
         // Update color based on difference
         const diffElem = document.getElementById('difference');
@@ -752,7 +943,7 @@
                 
                 let message = `Optimal selection found!\n\n`;
                 message += `Selected: ${result.selected_count} receipts\n`;
-                message += `Total: ₱${result.selected_total.toFixed(2)} (Target: ₱${result.target_amount.toFixed(2)})\n\n`;
+                message += `Total: ${currencySymbol}${result.selected_total.toFixed(2)} (Target: ${currencySymbol}${result.target_amount.toFixed(2)})\n\n`;
                 
                 if (addedCount === 0 && removedCount === 0) {
                     message += `No changes made - current selection is already optimal!`;
@@ -762,13 +953,13 @@
                     if (unchanged > 0) message += `→ Kept: ${unchanged} receipt(s)`;
                 }
                 
-                alert(message);
+                await AppModal.alert(message, { title: 'Optimal Selection', type: 'success' });
             } else {
-                alert('Error: ' + result.error);
+                await AppModal.alert('Error: ' + result.error, { title: 'Recompute Failed', type: 'error' });
             }
         } catch (error) {
             console.error('Recompute error:', error);
-            alert('Error recomputing selection: ' + error);
+            await AppModal.alert('Error recomputing selection: ' + error, { title: 'Recompute Failed', type: 'error' });
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<span class=\"btn-icon\">🔄</span> Recompute Best Selection';
@@ -776,7 +967,11 @@
     }
     
     async function removeReceipt(index) {
-        if (!confirm('Are you sure you want to permanently remove this receipt?')) {
+        const confirmed = await AppModal.confirm(
+            'Are you sure you want to permanently remove this receipt?',
+            { title: 'Remove Receipt', okText: 'Remove', cancelText: 'Cancel', danger: true, type: 'warning' }
+        );
+        if (!confirmed) {
             return;
         }
         
@@ -834,12 +1029,12 @@
                 // Update totals
                 updateSelectedTotals();
                 
-                alert('Receipt removed successfully!');
+                await AppModal.alert('Receipt removed successfully!', { title: 'Receipt Removed', type: 'success' });
             } else {
-                alert('Error: ' + result.error);
+                await AppModal.alert('Error: ' + result.error, { title: 'Remove Failed', type: 'error' });
             }
         } catch (error) {
-            alert('Error removing receipt: ' + error);
+            await AppModal.alert('Error removing receipt: ' + error, { title: 'Remove Failed', type: 'error' });
         }
     }
 </script>

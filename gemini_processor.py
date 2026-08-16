@@ -9,7 +9,7 @@ from io import BytesIO
 from PIL import Image
 from google import genai
 from google.genai import types
-from config import CURRENCY_SYMBOL
+from config import CURRENCY_SYMBOL, get_gemini_model
 
 
 # Configure Gemini API
@@ -73,18 +73,22 @@ def optimize_image_for_gemini(img, max_dimension=2048, quality=85):
     return img
 
 
-def process_receipts_with_gemini(image_paths, api_key=None):
+def process_receipts_with_gemini(image_paths, api_key=None, model=None):
     """
     Process receipt images using Gemini Flash 3 API.
     
     Args:
         image_paths: List of paths to receipt images
         api_key: Optional Gemini API key
+        model: Optional Gemini model name (defaults to Settings/config)
         
     Returns:
         List of receipt dictionaries with 'id', 'file_id', 'amount', 'box', 'image'
     """
     api_key = configure_gemini(api_key)
+    
+    if model is None:
+        model = get_gemini_model()
     
     # Initialize Gemini client
     client = genai.Client(api_key=api_key)
@@ -157,7 +161,7 @@ If no receipts are found, return an empty array: []"""
         
         # Generate content using the new API
         response = client.models.generate_content(
-            model='gemini-3-flash-preview',
+            model=model,
             contents=contents
         )
         

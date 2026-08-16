@@ -74,8 +74,9 @@ Add to your system environment variables or create a `.env` file in the project 
    - Set your Gemini model, currency symbol/code/name, and max overage
    - Click "Save Settings"
 
-## Using the Command Line
-API Key Not Found
+## Troubleshooting
+
+### API Key Not Found
 If you see "Gemini API key not found":
 - Make sure you've set the `GEMINI_API_KEY` environment variable
 - Restart your terminal/command prompt after setting it
@@ -94,19 +95,11 @@ app.run(debug=True, host='0.0.0.0', port=5001)  # Changed from 5000
 If you hit API rate limits:
 - Wait a few moments between requests
 - The free tier is generous but has limits
-- Consider upgrading for higher throughput Import Errors
-Run: `pip install -r requirements.txt`
-
-### Port Already in Use
-Change the port in `app.py`:
-```python
-app.run(debug=True, host='0.0.0.0', port=5001)  # Changed from 5000
-```
+- Consider upgrading for higher throughput
 
 ## Next Steps
 
 - Read the full [README.md](README.md) for detailed documentation
-- Check [examples.py](examples.py) for programmatic usage
 - Edit [config.py](config.py) to customize settings
 
 ## Support

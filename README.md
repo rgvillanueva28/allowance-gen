@@ -1,5 +1,8 @@
 # Receipt Processing Application
 
+> [!WARNING]
+> This application is created for personal use. As this application consumes AI credits, it is intended to be deployed internally only.
+
 An automated Python application that processes receipt images using Google Gemini AI, extracts amounts intelligently, selects receipts to match a target amount, and generates a professional PDF compilation.
 
 ## Features
@@ -18,30 +21,8 @@ An automated Python application that processes receipt images using Google Gemin
 - **Configurable Settings**: Gemini model, currency symbol/code/name, and max overage are editable in Settings
 - **Web Interface**: Easy-to-use browser-based interface for uploading and processing receipts
 - **Mobile Friendly**: Responsive design works seamlessly on phones and tablets
-- **Command Line**: Full-featured CLI for batch processing and automation
 
 ## Quick Start
-
-### Using the Startup Script (Easiest)
-
-**Windows:**
-```bash
-start-web.bat
-```
-
-**macOS/Linux:**
-```bash
-chmod +x start-web.sh
-./start-web.sh
-```
-
-The script will:
-1. Create a virtual environment (if needed)
-2. Install all dependencies
-3. Verify Tesseract installation
-4. Start the web server at http://localhost:5000
-
-### Manual Setup
 
 1. Install dependencies:
    ```bash
@@ -100,7 +81,7 @@ Or add it to your `.env` file or system environment variables for persistence.
 
 ## Usage
 
-The application can be used in two ways: through a web interface or via command line.
+The application is used through its web interface.
 
 ### Web Interface (Recommended)
 
@@ -121,46 +102,6 @@ The application can be used in two ways: through a web interface or via command 
    - Browse individual receipt images
 
 The web interface provides a user-friendly experience with real-time feedback and visual results.
-
-### Command Line Interface
-
-```bash
-python main.py receipt1.jpg receipt2.png -t 150.00
-```
-
-This will:
-1. Upload one or more images containing receipts
-2. Analyze them with Google Gemini AI
-3. Select receipts totaling close to $150.00
-4. Save selected receipts to `output/selected_receipts/`
-5. Generate `output/selected_receipts.pdf`
-
-### Command Line Options
-
-```
-python main.py [OPTIONS] IMAGE_FILES...
-
-Required Arguments:
-  IMAGE_FILES              One or more receipt image files (jpg, png, etc.)
-  -t, --target AMOUNT      Target total amount for receipt selection
-
-Optional Arguments:
-  -o, --output FILENAME    Output PDF filename (default: selected_receipts.pdf)
-  --output-dir DIR         Directory for output files (default: output/)
-  -h, --help              Show help message
-```
-
-### Examples
-
-**Process multiple images with custom output:**
-```bash
-python main.py receipts/*.jpg -t 250.50 -o my_receipts.pdf
-```
-
-**Specify custom output directory:**
-```bash
-python main.py image1.png image2.png -t 100 --output-dir results/
-```
 
 ## How It Works
 
@@ -234,13 +175,13 @@ The web application provides an intuitive interface with the following features:
 5. **Re-crop Images**: After loading a job, use the crop editor to adjust receipt boundaries
 6. **Re-download PDF**: Generate a new PDF with updated crops or selections
 
-All jobs are stored in the `output/` folder with a unique job ID. Each job includes:
+All jobs are stored in the `web_output/` folder with a unique job ID. Each job includes:
 - Original uploaded images
 - Processed receipt images
 - All metadata (amounts, selections, timestamps)
 - Generated PDF files
 
-Jobs persist until manually deleted or the `output/` folder is cleared. Jobs without metadata (older than 24 hours) are automatically cleaned up.
+Jobs persist until manually deleted or the `web_output/` folder is cleared. Jobs without metadata (older than 24 hours) are automatically cleaned up.
 
 ### Additional Features
 - **Auto-cleanup**: Temporary files without saved metadata are automatically removed after 24 hours
@@ -293,30 +234,13 @@ Edit `app.py` or set environment variables:
 
 ### Docker Deployment
 
-Create a `Dockerfile`:
-```dockerfile
-FROM python:3.10-slim
+The repository includes a `Dockerfile` and `docker-compose.yml`. To run with Docker Compose:
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt gunicorn
-
-COPY . .
-
-EXPOSE 5000
-
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+```bash
+docker compose up --build
 ```
 
-Build and run:
+Or build and run manually:
 ```bash
 docker build -t receipt-processor .
 docker run -p 5000:5000 receipt-processor
@@ -327,32 +251,30 @@ docker run -p 5000:5000 receipt-processor
 ```
 allowance-gen/
 ├── app.py                  # Web application server (Flask)
-├── main.py                 # Command-line interface
 ├── gemini_processor.py     # Google Gemini AI integration
 ├── receipt_selector.py     # Receipt selection algorithms
 ├── pdf_generator.py        # PDF generation
-├── config.py              # Configuration settings (fallback defaults)
-├── examples.py            # Example usage scripts
+├── config.py               # Configuration settings (fallback defaults)
 ├── requirements.txt        # Python dependencies
-├── settings.json           # User preferences (model, currency, names) from Settings page
 ├── .gitignore             # Git ignore rules
+├── .dockerignore          # Docker ignore rules
+├── Dockerfile             # Docker image definition
+├── docker-compose.yml     # Docker Compose setup
+├── .env.example           # Example environment variables
 ├── README.md              # This file
 ├── QUICKSTART.md          # Quick start guide
-├── start-web.bat          # Windows startup script
-├── start-web.sh           # Unix/Linux/macOS startup script
 ├── templates/             # HTML templates for web interface
 │   ├── base.html         # Base template
 │   ├── index.html        # Upload page
 │   ├── results.html      # Results page
 │   ├── images.html       # Image gallery
 │   ├── history.html      # Job history page
+│   ├── settings.html     # Settings page
 │   ├── crop_editor.html  # Interactive crop editor
 │   └── about.html        # About page
 ├── static/                # Static assets
 │   └── style.css         # Stylesheet
-├── output/                # CLI output directory
-│   ├── selected_receipts/
-│   └── *.pdf
+├── settings.json          # User preferences (model, currency, names) from Settings page (gitignored)
 ├── uploads/               # Web app uploads (temporary)
 └── web_output/            # Web app output with job persistence
     ├── <job_id>/          # Individual job folders
@@ -424,7 +346,6 @@ If no receipts are selected, check that your target is reasonable given the avai
 - **Werkzeug**: WSGI utility library for Flask
 - **google-genai**: Google Gemini AI API client (latest version)
 - **Pillow**: Image manipulation
-- **numpy**: Numerical operations
 - **reportlab**: PDF generation
 
 ## Future Enhancements

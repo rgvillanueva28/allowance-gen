@@ -35,9 +35,8 @@ wheels/
 *~
 
 # Project specific
-output/
+settings.json
 temp/
 *.pdf
-selected_receipts/
 uploads/
 web_output/

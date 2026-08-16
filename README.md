@@ -3,118 +3,135 @@
 > [!WARNING]
 > This application is created for personal use. As this application consumes AI credits, it is intended to be deployed internally only.
 
-An automated Python application that processes receipt images using Google Gemini AI, extracts amounts intelligently, selects receipts to match a target amount, and generates a professional PDF compilation.
+An automated Python application that processes receipt images using Google Gemini AI: upload one or more images (each may contain a single receipt or several), Google Gemini detects every individual receipt and extracts its total, the application computes the best combination of receipts that reaches (or comes closest to) your target amount, and the selected receipts are compiled into a PDF.
 
 ## Features
 
-- **AI-Powered Detection**: Uses Google Gemini Flash 3 to detect and analyze receipts
-- **Multi-receipt Processing**: Automatically detects and extracts individual receipts from images containing multiple receipts
-- **Intelligent Amount Extraction**: AI-powered extraction of total amounts from receipts
-- **Smart Selection**: Intelligent algorithms to select receipts that best match your target amount
-- **Image Extraction**: Saves selected receipts as individual image files
-- **PDF Generation**: Creates a professional PDF document with selected receipt images
-- **Image Crop Editor**: Interactive crop tool to adjust receipt boundaries and rotation
-- **Image Viewer**: Click any receipt image to open a zoomable, pannable viewer
-- **Job Persistence**: All processing jobs are automatically saved and can be revisited later
-- **Live Job History**: Jobs appear in History while still processing (with a status badge)
-- **Job History**: Browse and reload previous jobs to re-crop, re-download, or review results
-- **Configurable Settings**: Gemini model, currency symbol/code/name, and max overage are editable in Settings
-- **Web Interface**: Easy-to-use browser-based interface for uploading and processing receipts
-- **Mobile Friendly**: Responsive design works seamlessly on phones and tablets
+- **AI Receipt Detection**: Google Gemini detects individual receipts and extracts totals from images containing multiple receipts.
+- **Smart Selection**: Algorithms pick a receipt combination that best matches your target amount (within `max_overage`).
+- **Editable Receipts**: Edit extracted amounts, manually add receipts (image + amount), recompute the best selection from a chosen subset, and remove unwanted receipts.
+- **Crop & Rotate Editor**: Interactive editor with bounding-box crop and rotation; recropping always works from pristine originals.
+- **Auto-Rotate**: Landscape receipt images are automatically rotated to portrait for the PDF.
+- **PDF & Image Output**: Produces a title-summary PDF of selected receipts and saves individual receipt images; full-screen zoom/pan viewer in the gallery.
+- **Job Persistence**: Every job is saved with metadata; jobs appear in History while still processing and complete (or fail) live.
+- **Configurable Settings**: Name, Gemini model, currency (symbol/code/name), and max overage are editable from the Settings page (API key remains in `.env`).
+- **Responsive UI**: Works on desktop, tablet, and mobile.
 
 ## Quick Start
 
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+Run locally in three steps:
 
-2. Start the web application:
-   ```bash
-   python app.py
-   ```
-
-3. Open your browser to http://localhost:5000
-
-See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.
-
-## Prerequisites
-
-- Python 3.8 or higher
-- Google Gemini API key (free tier available)
-
-### Getting a Gemini API Key
-
-1. Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Sign in with your Google account
-3. Click "Create API Key"
-4. Copy your API key
-5. Set it as an environment variable:
-
-**Windows (Command Prompt):**
-```cmd
-set GEMINI_API_KEY=your-api-key-here
-```
-
-**Windows (PowerShell):**
-```powershell
-$env:GEMINI_API_KEY="your-api-key-here"
-```
-
-**macOS/Linux:**
 ```bash
-export GEMINI_API_KEY="your-api-key-here"
+cp .env.example .env          # 1. then set your GEMINI_API_KEY inside .env
+pip install -r requirements.txt  # 2. install dependencies
+python app.py                 # 3. open http://localhost:5000
 ```
 
-Or add it to your `.env` file or system environment variables for persistence.
+For a step-by-step walkthrough (including getting a Gemini API key), see [QUICKSTART.md](QUICKSTART.md).
 
-> **Note:** API keys are stored **only** in `.env` (or environment variables). Never put your API key in `settings.json` or the Settings page. The Gemini **model** name and currency preferences are configured on the Settings page.
+## Running the App
 
-## Installation
+The app is a Flask web server with two run modes: **locally** (development) and **in Docker** (deployment). Both serve the same app on port 5000; the only differences are how you start them and where job data lives.
 
-1. Clone or download this repository
-2. Navigate to the project directory
-3. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Prerequisites
 
-## Usage
+- **Local only:** Python 3.8 or higher
+- A **Google Gemini API key** — get one from [Google AI Studio](https://aistudio.google.com/app/apikey)
 
-The application is used through its web interface.
+### Step 1 — Configure `.env` (do this once)
 
-### Web Interface (Recommended)
+Copy the template and fill in your values:
 
-1. Start the web server:
-   ```bash
-   python app.py
-   ```
+```bash
+cp .env.example .env
+```
 
-2. Open your browser and navigate to:
-   ```
-   http://localhost:5000
-   ```
+Then edit `.env`:
 
-3. Use the web interface to:
-   - Upload receipt images (drag & drop or click to select)
-   - Set your target amount
-   - View results and download PDF
-   - Browse individual receipt images
+```env
+GEMINI_API_KEY=your-api-key-here
+SECRET_KEY=some-random-string
+```
 
-The web interface provides a user-friendly experience with real-time feedback and visual results.
+| Variable | Required | What it does |
+|---|---|---|
+| `GEMINI_API_KEY` | Yes | Google Gemini API key used for receipt detection |
+| `SECRET_KEY` | No | Signs Flask sessions; falls back to a hardcoded dev default if unset |
+
+> **Notes:**
+> - The app loads `.env` automatically via `python-dotenv`.
+> - The `FLASK_ENV` and `DEBUG` entries in `.env.example` are **not read by the app**. `python app.py` always starts the Flask dev server with debug mode on, so you don't need to touch them.
+> - Keep your API key **only** in `.env` — never in `settings.json` or the Settings page. The Gemini **model** name and currency preferences are configured on the Settings page.
+
+### Step 2 — Choose how to run it
+
+#### Option A: Run locally (development)
+
+```bash
+pip install -r requirements.txt
+python app.py
+```
+
+- Open http://localhost:5000
+- Runs the Flask dev server with debug and auto-reload enabled (restarts on code changes)
+- Job data is stored in `uploads/` and `web_output/` in the project directory
+
+*(Optional) use a virtual environment:*
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate      # Windows
+source .venv/bin/activate   # macOS/Linux
+pip install -r requirements.txt
+python app.py
+```
+
+#### Option B: Run with Docker (deployment)
+
+The repo includes a `Dockerfile` and `docker-compose.yml` that package the app and run it in a container.
+
+```bash
+docker compose up --build -d
+```
+
+- App is available at http://localhost:5000
+- Your `.env` is passed into the container (`env_file`)
+- `uploads/` and `web_output/` are mounted as volumes, so jobs survive container restarts
+- `restart: unless-stopped` keeps it running across reboots
+
+Stop it with `docker compose down`.
+
+Without compose:
+
+```bash
+docker build -t receipt-processor .
+docker run -p 5000:5000 --env-file .env \
+  -v "$PWD/uploads:/app/uploads" -v "$PWD/web_output:/app/web_output" \
+  receipt-processor
+```
+
+> **Note:** The container runs the same built-in Flask server (`python app.py`), not a WSGI server like Gunicorn. That's fine for internal/personal use, but if you ever expose it publicly, put a reverse proxy (e.g. nginx/Caddy) in front of it.
+
+### Configuring user preferences
+
+User-facing preferences are managed on the **Settings page** (`/settings`) and persisted to `settings.json` (gitignored):
+
+- `first_name` / `last_name` — used in generated PDF filenames
+- `gemini_model` — Google Gemini model used for processing
+- `currency_symbol` / `currency_code` / `currency_name` — display currency
+- `max_overage` — maximum amount the selection may exceed the target
 
 ## How It Works
 
 ### 1. AI-Powered Analysis
-The application uses Google Gemini Flash 3 to:
-- Detect individual receipts in images
-- Handle multiple receipts per image
-- Extract precise bounding boxes for each receipt
-- Read and understand receipt text
-- Identify total amounts with high accuracy
+You upload one or more images; each image may contain a single receipt or several. All images are passed to Google Gemini in one call, which:
+- Detects every individual receipt within each image
+- Extracts precise bounding boxes for each receipt
+- Reads the receipt text and identifies the total amount of each receipt
+- Returns one extracted receipt per detected receipt, across all uploaded images
 
 ### 2. Receipt Selection
-Multiple strategies are employed to match the target amount:
+From the full list of extracted receipts, the application computes the best combination to match your target amount:
 - **Exact Match**: Finds combinations within tolerance
 - **Best Fit**: Maximizes total without exceeding target
 - **Closest Match**: Finds nearest total (may exceed target)
@@ -125,126 +142,30 @@ Creates a professional PDF containing:
 - Individual pages for each selected receipt
 - Final summary page with itemized list
 
-## Web Interface Features
+## Web Interface
 
-The web application provides an intuitive interface with the following features:
+The web UI has five pages, each focused on one step of the workflow:
 
-### Upload Page
-- **Drag & Drop Upload**: Simply drag receipt images onto the upload area
-- **Multi-file Selection**: Upload multiple images at once
-- **File Validation**: Automatic validation of file types and sizes
-- **Target Amount Input**: Easy-to-use input field with validation
-- **Real-time Feedback**: Visual confirmation of selected files
-- **AI Processing**: Powered by Google Gemini for accurate results
+| Page | What it does |
+|------|--------------|
+| **Upload** (`/`) | Drag-and-drop or click-to-select images, set the target amount, validate files. |
+| **Results** (`/results`) | Summary dashboard with selection count (e.g. `6 / 7`), quick links to crop, images, and PDF download. |
+| **Images** (`/images`) | Per-receipt gallery with zoom/pan viewer; edit amounts, add manual receipts, remove receipts, recompute selection, regenerate PDF. |
+| **Crop Editor** (`/crop-editor`) | Adjust bounding boxes and rotation per receipt; re-crop from pristine originals and rebuild the PDF. |
+| **History** (`/history`) | Browse saved jobs with thumbnails and stats; load to resume, delete old jobs. |
+| **Settings** (`/settings`) | Edit your name (used in PDF filename), Gemini model, currency, and max overage. API key stays in `.env`. |
 
-### Results Page
-- **Summary Dashboard**: Visual cards showing key metrics
-- **Selection Summary**: Shows the number of selected receipts out of the total (e.g. `6 / 7`)
-- **Quick Actions**: Download PDF or view individual images
-- **Detailed Breakdown**: Complete summary of processing results
+### Job Persistence
 
-### Image Gallery
-- **Visual Preview**: View all selected receipt images
-- **Individual Download**: Download specific receipt images
-- **Zoomable Viewer**: Click any receipt to open a full-screen viewer with zoom in/out, reset, and pan controls
-- **Responsive Layout**: Adapts to different screen sizes
+Jobs are stored as folders under `web_output/<job_id>/` containing `originals/`, `receipts/`, `metadata.json`, and `selected_receipts.pdf`. A job appears in History immediately with a `Processing` status and updates to `Completed` or `Failed` when Gemini finishes. Jobs persist indefinitely until deleted; only unsaved uploads in `uploads/` are cleaned after 24h.
 
-### Settings Page
-- **Personal Information**: First and last name used in generated file names
-- **AI Configuration**: Gemini model selection (API key stays in `.env`)
-- **Currency Settings**: Symbol, code, and name used throughout the app
-- **Receipt Selection**: Max overage allowed when matching a target amount
+### Workflow
 
-### Job Persistence & History
-- **Automatic Saving**: All processing jobs are automatically saved with complete metadata
-- **Live Processing Status**: Jobs appear in History immediately with a "Processing" badge while Gemini works, then update to "Completed" (or "Failed")
-- **Job History Page**: Browse all previously processed jobs with preview thumbnails
-- **Session Restoration**: Load any saved job to continue working with it
-- **Re-crop & Re-download**: Access original images to adjust crops and regenerate PDFs
-- **Job Management**: Delete old jobs you no longer need
-- **No Database Required**: File-based storage keeps everything self-contained
-- **Statistics Display**: Each saved job shows total receipts, selected count, and amounts
-- **Visual Previews**: See thumbnail previews of the first 4 receipts in each job
-
-#### Using Job History
-
-1. **Access History**: Click the "History" link in the navigation menu
-2. **Browse Jobs**: View all saved jobs with their processing date and statistics
-3. **Load a Job**: Click "Load" to restore a previous job and continue working
-4. **Delete Jobs**: Click "Delete" to remove jobs you no longer need (confirmation shown in a modal)
-5. **Re-crop Images**: After loading a job, use the crop editor to adjust receipt boundaries
-6. **Re-download PDF**: Generate a new PDF with updated crops or selections
-
-All jobs are stored in the `web_output/` folder with a unique job ID. Each job includes:
-- Original uploaded images
-- Processed receipt images
-- All metadata (amounts, selections, timestamps)
-- Generated PDF files
-
-Jobs persist until manually deleted or the `web_output/` folder is cleared. Jobs without metadata (older than 24 hours) are automatically cleaned up.
-
-### Additional Features
-- **Auto-cleanup**: Temporary files without saved metadata are automatically removed after 24 hours
-- **Session Management**: Each processing job is isolated with unique IDs
-- **Error Handling**: User-friendly error messages and guidance
-- **Responsive Design**: Works on desktop, tablet, and mobile devices
-
-## Deployment
-
-### Local Development
-```bash
-python app.py
-```
-The server will start on `http://localhost:5000`
-
-### Production Deployment
-
-For production deployment, use a WSGI server like Gunicorn:
-
-1. Install Gunicorn:
-   ```bash
-   pip install gunicorn
-   ```
-
-2. Run with Gunicorn:
-   ```bash
-   gunicorn -w 4 -b 0.0.0.0:5000 app:app
-   ```
-
-3. Set environment variables:
-   ```bash
-   export SECRET_KEY='your-secret-key-here'
-   export FLASK_ENV='production'
-   ```
-
-### Configuration Options
-
-User-facing preferences are managed on the **Settings page** (`/settings`) and stored in `settings.json`:
-- `first_name` / `last_name`: Personalized download file names
-- `gemini_model`: Google Gemini model used for processing
-- `currency_symbol` / `currency_code` / `currency_name`: Display currency
-- `max_overage`: Maximum amount the selection may exceed the target
-
-Edit `app.py` or set environment variables:
-- `SECRET_KEY`: Session encryption key (required for production)
-- `MAX_FILE_SIZE`: Maximum upload file size (default: 16MB)
-- `UPLOAD_FOLDER`: Directory for temporary uploads
-- `OUTPUT_FOLDER`: Directory for processed files
-- `GEMINI_API_KEY`: Your Google Gemini API key (required, keep in `.env`)
-
-### Docker Deployment
-
-The repository includes a `Dockerfile` and `docker-compose.yml`. To run with Docker Compose:
-
-```bash
-docker compose up --build
-```
-
-Or build and run manually:
-```bash
-docker build -t receipt-processor .
-docker run -p 5000:5000 receipt-processor
-```
+1. Configure once in **Settings** (model, currency, name, max overage).
+2. Upload one or more images (each may contain multiple receipts) and a target amount on the **Upload** page.
+3. Review the **Results** dashboard, then jump to **Images** to edit/add/remove receipts or recompute the optimal subset.
+4. Open the **Crop Editor** to fine-tune boxes or rotation — re-saving rebuilds the PDF from originals.
+5. Download the PDF from **Results** (or via History later).
 
 ## Project Structure
 
@@ -309,9 +230,9 @@ allowance-gen/
 
 ### API Key Issues
 If you get an error about missing API key:
-1. Ensure you've set the `GEMINI_API_KEY` environment variable
+1. Ensure `GEMINI_API_KEY` is set in your `.env` file
 2. Verify your API key is valid at [Google AI Studio](https://aistudio.google.com/app/apikey)
-3. Check that the environment variable is set in the current terminal session
+3. Restart the app after changing `.env`
 
 ### API Rate Limits
 If you hit rate limits:
@@ -340,6 +261,12 @@ The selection algorithm will:
 
 If no receipts are selected, check that your target is reasonable given the available receipt amounts.
 
+### Port Already in Use
+If port 5000 is taken, change it in `app.py`:
+```python
+app.run(debug=True, host='0.0.0.0', port=5001)  # Changed from 5000
+```
+
 ## Dependencies
 
 - **Flask**: Web framework for the user interface
@@ -350,19 +277,13 @@ If no receipts are selected, check that your target is reasonable given the avai
 
 ## Future Enhancements
 
-Potential improvements for future versions:
-- **API Endpoints**: RESTful API for programmatic access
-- **Database Integration**: Store receipt history and processing results
-- **User Authentication**: Multi-user support with accounts
-- **Advanced ML**: Machine learning models for better amount detection
-- **Multi-language Support**: OCR support for receipts in different languages
-- **Cloud Storage**: Integration with cloud storage services (S3, Google Cloud)
-- **Email Integration**: Send PDF directly via email
-- **Batch Processing**: Queue system for processing large numbers of receipts
-- **Mobile App**: Native mobile applications for iOS and Android
-- **Receipt Analytics**: Spending analytics and visualization
-- **Cloud OCR Services**: Integration with Google Vision, AWS Textract
-- **Export Formats**: Support for Excel, CSV exports in addition to PDF
+- **REST API**: Programmatic access to upload, process, and download endpoints.
+- **Database Backend**: Replace file-based job storage with SQLite/Postgres for easier querying and analytics.
+- **Multi-User Auth**: Accounts, per-user job history, and shared link generation.
+- **Email Delivery**: Send the generated PDF directly via email.
+- **Job Queue**: Async worker for processing large batches without blocking the UI.
+- **Cloud Storage & OCR**: S3/GCS storage backends; optional Google Vision / AWS Textract fallbacks for low-confidence Gemini results.
+- **Exports & Analytics**: Excel/CSV export; spending trends by category and merchant.
 
 ## License
 
